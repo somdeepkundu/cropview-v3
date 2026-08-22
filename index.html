@@ -227,6 +227,9 @@
     <input id="pname" class="tinput" type="text" placeholder="e.g. Wheat_Nashik_May2026" maxlength="60" autocomplete="off" spellcheck="false" />
     <span class="flbl">Surveyor / Notes (optional)</span>
     <input id="pnotes" class="tinput" type="text" placeholder="e.g. Somdeep · Pre-harvest check" maxlength="80" autocomplete="off" />
+    <span class="flbl">Camera Height Above Ground (m)</span>
+    <input id="pcamh" class="tinput" type="number" step="0.05" min="0.2" max="30" value="1.5" inputmode="decimal" />
+    <div class="fhint">📏 Chest/eye height when standing ≈ <span style="color:var(--green)">1.4–1.6 m</span>. This scales the entire ground footprint — set it accurately.</div>
     <div class="fhint">📁 Images will be named:<br/><span style="color:var(--green);font-family:var(--mono);font-size:10px">ProjectName_ID_YYYYMMDDHHMMSS_lat_lon.jpg</span></div>
     <button class="btn bp" style="width:100%;margin-top:4px" onclick="startProject()">Start Session →</button>
   </div>
@@ -318,7 +321,7 @@
   <div id="about-box">
     <div id="about-x" onclick="closeAboutDirect()">✕</div>
     <div class="alogo">CROP<span>VIEW</span></div>
-    <div class="aver">Version 3.0.0 · Layer 1 of 3 · 2026 · Compass Reliability Rebuild</div>
+    <div class="aver">Version 3.1.0 · Layer 1 of 3 · 2026 · Footprint Geometry Fix</div>
 
     <div class="asec">
       <h4>👨‍🔬 Developed By</h4>
@@ -376,7 +379,7 @@
 
   <!-- HEADER -->
 <div id="header">
-  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.0.0</span><span class="proj" id="hproj">—</span></div>
+  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.1.0</span><span class="proj" id="hproj">—</span></div>
   <div id="hdr-right">
     <span id="cap-badge">0 cap</span>
     <div id="gps-btn" onclick="openGPS()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s">📡 GPS</div>
@@ -487,7 +490,8 @@
       <div class="dr"><span class="dl">Smoothed Samples</span><span class="dv" id="d-smp">—</span></div>
       <div class="dr"><span class="dl">Altitude</span><span class="dv" id="d-alt">—</span></div>
       <div class="dr"><span class="dl">Azimuth</span><span class="dv" id="d-az">—</span></div>
-      <div class="dr"><span class="dl">Device Tilt β</span><span class="dv" id="d-tilt">—</span></div>
+      <div class="dr"><span class="dl">Camera Tilt (nadir)</span><span class="dv" id="d-tilt">—</span></div>
+      <div class="dr"><span class="dl">Camera Height</span><span class="dv" id="d-camh">—</span></div>
       <div class="dr"><span class="dl">Est. H-FOV</span><span class="dv" id="d-fov">~65°</span></div>
       <div class="dr"><span class="dl">Ground Footprint</span><span class="dv" id="d-fp">—</span></div>
     </div>
@@ -530,6 +534,9 @@ const S = {
   lat:null,lon:null,alt:null,acc:null,altAcc:null,lastGPSTime:null,
   gpsSamples:0,
   az:0,tilt:45,fov:65,
+  camH:1.5,            // camera height ABOVE GROUND in metres — NOT GPS altitude.
+                       // This is what the footprint geometry scales with; S.alt
+                       // (height above sea level) must never be used here.
   // ── heading fusion (v3) ──
   compassRaw:0,        // platform-corrected compass heading (true CW from north)
   compassOffset:0,     // running calibration vs GPS truth
@@ -596,6 +603,31 @@ function screenAngle(){
   return 0;
 }
 function angDiff(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+
+/* Tilt of the REAR CAMERA axis measured from nadir (straight down).
+     0°  = camera pointing straight at the ground
+    90°  = camera on the horizon
+   >90°  = camera pointing above the horizon (at the sky — no ground intersection)
+
+   v3.0 used Math.abs(e.beta||45), which was wrong three ways:
+     - it ignored gamma, so in landscape a phone aimed 45° down reported
+       beta≈0 and the app called it FLAT;
+     - Math.abs() made a phone aimed at the sky indistinguishable from one
+       aimed at the crop;
+     - `||45` turned a genuine beta===0 (phone flat, camera straight down)
+       into a fabricated 45° reading.
+   The device z-axis has world-vertical component cos(beta)cos(gamma), so the
+   rear camera (-z) sits acos(cos b · cos g) off nadir. Screen-rotation
+   independent, because it describes a physical axis, not the screen. */
+function tiltFromEvent(e){
+  const b=e.beta, g=e.gamma;
+  if(b===null||b===undefined||isNaN(b)) return null;
+  if(g===null||g===undefined||isNaN(g)) return null;
+  const br=b*Math.PI/180, gr=g*Math.PI/180;
+  let c = Math.cos(br)*Math.cos(gr);
+  c = Math.min(1, Math.max(-1, c));
+  return Math.round(Math.acos(c)*180/Math.PI);
+}
 function lerpAngle(a,b,t){ let d=((b-a+540)%360)-180; return ((a+d*t)%360+360)%360; }
 
 function fuseHeading(){
@@ -637,6 +669,9 @@ function startProject(){
   if(!n){toast('Enter a project name','err');return;}
   S.proj.name  = n.replace(/[^a-zA-Z0-9_\-.]/g,'_');
   S.proj.notes = document.getElementById('pnotes').value.trim();
+  const ch = parseFloat(document.getElementById('pcamh').value);
+  if(!isFinite(ch) || ch < 0.2 || ch > 30){ toast('Camera height must be 0.2–30 m','err'); return; }
+  S.camH = ch;
   S.proj.t     = new Date().toISOString();
   document.getElementById('proj-screen').classList.remove('on');
   document.getElementById('hproj').textContent = S.proj.name;
@@ -774,26 +809,29 @@ function trackAlphaChange(raw){
 function applyHeading(headingDeg, tiltDeg){
   S.compassRaw = (headingDeg%360+360)%360;
   S.lastValidOriTime = Date.now();
-  S.tilt = tiltDeg;
+  if(tiltDeg !== null) S.tilt = tiltDeg;  // null => hold last good tilt, never invent one
   fuseHeading();
   updTilt(); updHUD(); updData();
 }
 
 function onOriAbs(e){
-  S.gotAbsolute = true;
   S.lastAnyOriTime = Date.now();
   if(e.alpha===null || e.alpha===undefined || isNaN(e.alpha)) return; // invalid — never treat as 0/North
+  // Latch ONLY here, below the validation. Latching on the bare event (as v3.0
+  // did) let a single alpha===null absolute event kill the relative fallback
+  // permanently — the compass then never recovered.
+  S.gotAbsolute = true;
   trackAlphaChange(e.alpha);
   // Android deviceorientationabsolute — alpha increases COUNTER-clockwise.
   // True compass heading = (360 - alpha), plus screen-orientation correction.
-  applyHeading((360 - e.alpha + screenAngle()) % 360, Math.round(Math.abs(e.beta||45)));
+  applyHeading((360 - e.alpha + screenAngle()) % 360, tiltFromEvent(e));
 }
 function onOriRel(e){
   if(S.gotAbsolute) return; // a valid absolute stream is alive — ignore the relative one
   S.lastAnyOriTime = Date.now();
   if(e.alpha===null || e.alpha===undefined || isNaN(e.alpha)) return;
   trackAlphaChange(e.alpha);
-  applyHeading((360 - e.alpha + screenAngle()) % 360, Math.round(Math.abs(e.beta||45)));
+  applyHeading((360 - e.alpha + screenAngle()) % 360, tiltFromEvent(e));
 }
 function onOriIOS(e){
   S.lastAnyOriTime = Date.now();
@@ -803,7 +841,7 @@ function onOriIOS(e){
   const acc = e.webkitCompassAccuracy; // degrees; -1 or a large value means "don't trust this"
   S.lowConfidence = (typeof acc==='number') && (acc<0 || acc>40);
   // iOS — already a true compass heading, clockwise from north
-  applyHeading(h, Math.round(Math.abs(e.beta||45)));
+  applyHeading(h, tiltFromEvent(e));
 }
 function onMotion(){ S.lastMotionTime = Date.now(); } // heartbeat only — proves the sensor stack is alive
 
@@ -854,7 +892,7 @@ function watchdogTick(){
    instead of only redrawing when one happens to fire. */
 let _lastFovDraw = 0;
 function visualLoop(ts){
-  S.dispAz = lerpAngle(S.dispAz, S.az, 0.2);
+  S.dispAz = lerpAngle(S.dispAz, S.heading, 0.2);  // fused heading, so rose and map cone always agree
   const crose = document.getElementById('crose');
   if(crose) crose.style.transform = `rotate(${-S.dispAz}deg)`;
   if(!_lastFovDraw || ts - _lastFovDraw > 120){ updFov(); _lastFovDraw = ts; }
@@ -870,7 +908,8 @@ function paintCompassHealth(){
 /* ── TILT GUIDE ── */
 function updTilt(){
   const t=S.tilt, H=130;
-  // 0° = phone flat, 90° = phone vertical
+  // Tilt is measured from nadir: 0° = camera straight down, 90° = horizon,
+  // >90° = aimed above the horizon (sky — no ground footprint exists).
   // Optimal: 30°–50°
   const pct = Math.min(Math.max(t/90,0),1);
   const pin = pct*(H-4);
@@ -880,12 +919,13 @@ function updTilt(){
   oz.style.top=oTop+'px'; oz.style.height=(oBot-oTop)+'px';
   const pinEl = document.getElementById('tilt-pin');
   pinEl.style.top=pin+'px';
-  const ok = t>=28&&t<=55;
+  const ok = t>=28&&t<=55&&t<TILT_MAX;
   pinEl.className = ok?'':'warn'; pinEl.id='tilt-pin';
   const degEl = document.getElementById('tilt-deg');
   degEl.textContent=t+'°'; degEl.className=ok?'':'warn'; degEl.id='tilt-deg';
   const lbl = document.getElementById('tilt-lbl');
-  if(t<15) lbl.textContent='FLAT';
+  if(t>=TILT_MAX) lbl.textContent='SKY ✕';
+  else if(t<15) lbl.textContent='FLAT';
   else if(t>65) lbl.textContent='STEEP';
   else if(ok) lbl.textContent='✓ GOOD';
   else lbl.textContent='TILT';
@@ -930,30 +970,57 @@ function updData(){
   set('d-smp',S.gpsSamples>0?S.gpsSamples+' / '+GPS_BUF_MAX+' (drop-worst averaging)':null);
   set('d-alt',S.alt?S.alt.toFixed(1)+' m':null);
   set('d-az',Math.round(S.heading)+'° '+azLbl(S.heading)+'  ['+S.headingSrc+']');
-  set('d-tilt',S.tilt+'°');
-  const fp=calcFP(); set('d-fp',fp?fp.w.toFixed(1)+' × '+fp.d.toFixed(1)+' m':null);
+  set('d-tilt',S.tilt+'° from nadir'+(S.tilt>=TILT_MAX?' — above horizon':''));
+  set('d-camh',S.camH.toFixed(2)+' m above ground');
+  const fp=calcFP();
+  set('d-fp',fp?fp.w.toFixed(1)+' × '+fp.d.toFixed(1)+' m':(S.lat?'— (aimed at/above horizon)':null));
 }
 function azLbl(a){return['N','NE','E','SE','S','SW','W','NW','N'][Math.round(a/45)%8];}
 
-/* ── FOOTPRINT ── */
+/* ── FOOTPRINT ───────────────────────────────────────────────────
+   CRITICAL: H is the camera's height ABOVE GROUND (S.camH, ~1.5 m).
+   v3.0 used `S.alt || 1.5` — S.alt is GPS altitude above SEA LEVEL, so on
+   the Maharashtra plateau (~650 m) every footprint came out ~400x too
+   large and every exported fov_polygon covered a whole village. Never
+   reintroduce S.alt here; it is a different quantity entirely.
+
+   Geometry, with tilt measured from nadir:
+     ground range  r(t)  = H·tan(t)
+     slant range   R(r)  = sqrt(H² + r²)
+     half-width at r     = R(r)·tan(hfov/2)     (slant range, not ground range)
+   Depth is the true near-to-far spread, H·(tan(t+v/2) − tan(t−v/2)), not
+   the old gd·tan(v) approximation. Vertical FOV is derived through the
+   tangent, since FOV angles do not scale linearly with aspect ratio. */
+const TILT_MAX = 85;   // beyond this the ray is effectively at/above the horizon
+
 function calcFP(){
   if(!S.lat||!S.lon) return null;
-  const H=S.alt||1.5, tr=(S.tilt*Math.PI)/180, hr=(S.fov*Math.PI)/180, vr=(hr*9)/16;
-  const gd=Math.abs(H*Math.tan(tr));
-  return {w:Math.abs(2*gd*Math.tan(hr/2))||5, d:Math.abs(gd*Math.tan(vr))||3, gd};
+  const H = S.camH, t = S.tilt;
+  if(!isFinite(t) || t >= TILT_MAX) return null;   // no usable ground intersection
+  const tr = t*Math.PI/180;
+  const hr = S.fov*Math.PI/180;
+  const vr = 2*Math.atan(Math.tan(hr/2)*(9/16));   // 16:9 sensor, correct tangent form
+  const cap = TILT_MAX*Math.PI/180;
+  const tNear = Math.max(tr - vr/2, 0);
+  const tFar  = Math.min(tr + vr/2, cap);
+  const near = H*Math.tan(tNear);
+  const far  = H*Math.tan(tFar);
+  const gd   = H*Math.tan(tr);
+  const halfW = r => Math.sqrt(H*H + r*r)*Math.tan(hr/2);
+  return {near, far, gd, wNear:halfW(near)*2, wFar:halfW(far)*2,
+          w: halfW(gd)*2, d: far - near};
 }
 function calcPoly(){
   if(!S.lat||!S.lon) return null;
   const fp=calcFP(); if(!fp) return null;
   // Project FORWARD along the fused true heading — no offset hacks.
-  // The back camera looks where the phone's top edge points, which is
-  // exactly the compass heading.
-  const O=turf.point([S.lon,S.lat]), b=((S.heading%360)+360)%360, hw=fp.w/2;
-  const fc=turf.destination(O,fp.gd/1000,b), [fcx,fcy]=fc.geometry.coordinates;
-  const fL=turf.destination(turf.point([fcx,fcy]),hw/1000,b-90).geometry.coordinates;
-  const fR=turf.destination(turf.point([fcx,fcy]),hw/1000,b+90).geometry.coordinates;
-  const nL=turf.destination(O,hw/2000,b-90).geometry.coordinates;
-  const nR=turf.destination(O,hw/2000,b+90).geometry.coordinates;
+  const O=turf.point([S.lon,S.lat]), b=((S.heading%360)+360)%360;
+  const at=(r,off)=>{
+    const c=turf.destination(O, r/1000, b).geometry.coordinates;
+    return off===0 ? c : turf.destination(turf.point(c), Math.abs(off)/1000, b+(off>0?90:-90)).geometry.coordinates;
+  };
+  const nL=at(fp.near,-fp.wNear/2), nR=at(fp.near, fp.wNear/2);
+  const fL=at(fp.far, -fp.wFar/2),  fR=at(fp.far,  fp.wFar/2);
   return [nL,fL,fR,nR,nL];
 }
 
@@ -1003,9 +1070,10 @@ function doCapture(){
   const sl=document.createElement('div');sl.className='scanl';
   document.getElementById('vcont').appendChild(sl);setTimeout(()=>sl.remove(),700);
   const fp=calcFP(), poly=calcPoly();
+  if(!fp) { toast('Camera is at/above the horizon — tilt down before capturing','err'); return; }
   const cap={id:'CV-'+Date.now(),imgName:nm,timestamp:now.toISOString(),project:S.proj.name,
     lat:S.lat,lon:S.lon,altitude:S.alt,accuracy:S.acc,az:Math.round(S.heading),
-    headingSrc:S.headingSrc,tilt:S.tilt,fov:S.fov,
+    headingSrc:S.headingSrc,tilt:S.tilt,camH:S.camH,fov:S.fov,
     stage:S.stage,fp:fp?{w:fp.w,d:fp.d}:null,poly,thumb,full};
   S.caps.unshift(cap); saveCaps(); pinOnMap(cap); rendList();
   document.getElementById('cap-badge').textContent=S.caps.length+' cap';
@@ -1107,18 +1175,19 @@ async function doZIP(){
 
 function buildGJ(){
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.0.0',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
+    metadata:{app:'CropView L1',version:'3.1.0',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
     features:S.caps.map(c=>({type:'Feature',
       geometry:{type:'Point',coordinates:[c.lon,c.lat,c.altitude||0]},
       properties:{id:c.id,imgName:(c.imgName||c.id)+'.jpg',timestamp:c.timestamp,project:c.project,
         heading_deg:c.az,azimuth_deg:c.az,heading_source:c.headingSrc||null,
-        tilt_deg:c.tilt,hfov_deg:c.fov,gps_accuracy_m:c.accuracy,kc_stage:c.stage,
+        tilt_deg_from_nadir:c.tilt,tilt_deg:c.tilt,camera_height_m:c.camH??null,
+        hfov_deg:c.fov,gps_accuracy_m:c.accuracy,kc_stage:c.stage,
         footprint_width_m:c.fp?.w||null,footprint_depth_m:c.fp?.d||null},
       ...(c.poly?{fov_polygon:{type:'Polygon',coordinates:[c.poly]}}:{})}))};
 }
 function buildCSV(){
-  const h=['id','imgName','timestamp','project','lat','lon','altitude','accuracy_m','azimuth_deg','tilt_deg','hfov_deg','kc_stage','fp_w_m','fp_d_m'];
-  const r=S.caps.map(c=>[c.id,(c.imgName||c.id)+'.jpg',c.timestamp,c.project,c.lat,c.lon,c.altitude||'',c.accuracy||'',c.az,c.tilt,c.fov,c.stage||'',c.fp?.w||'',c.fp?.d||'']);
+  const h=['id','imgName','timestamp','project','lat','lon','altitude','accuracy_m','azimuth_deg','tilt_deg_from_nadir','camera_height_m','hfov_deg','kc_stage','fp_w_m','fp_d_m'];
+  const r=S.caps.map(c=>[c.id,(c.imgName||c.id)+'.jpg',c.timestamp,c.project,c.lat,c.lon,c.altitude||'',c.accuracy||'',c.az,c.tilt,c.camH??'',c.fov,c.stage||'',c.fp?.w||'',c.fp?.d||'']);
   return[h,...r].map(x=>x.join(',')).join('\n');
 }
 function buildFootprintsGJ(){
@@ -1131,7 +1200,8 @@ function buildFootprintsGJ(){
         id:c.id, imgName:(c.imgName||c.id)+'.jpg',
         timestamp:c.timestamp, project:c.project,
         heading_deg:c.az, azimuth_deg:c.az, heading_source:c.headingSrc||null,
-        tilt_deg:c.tilt, hfov_deg:c.fov,
+        tilt_deg_from_nadir:c.tilt, tilt_deg:c.tilt, camera_height_m:c.camH??null,
+        hfov_deg:c.fov,
         kc_stage:c.stage,
         footprint_width_m:c.fp?.w||null,
         footprint_depth_m:c.fp?.d||null,
@@ -1139,7 +1209,7 @@ function buildFootprintsGJ(){
       }
     }));
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.0.0',project:S.proj.name,
+    metadata:{app:'CropView L1',version:'3.1.0',project:S.proj.name,
       description:'FOV ground footprint polygons for all captures. Use for satellite pixel sampling in Layer 2.',
       exported:new Date().toISOString(),total:features.length},
     features};
