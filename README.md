@@ -1,14 +1,30 @@
 # 🌱 CropView v3
 
-**Geo-tagged field crop capture — the compass now heals itself.**
+**Geo-tagged field crop capture — correct ground geometry, self-healing compass.**
 
 A free, open-source single-file PWA for field researchers and agronomists. Point your phone at a crop; capture its location, heading, and ground field-of-view; match it to satellite data.
 
-**Version 3.0.0** · Layer 1 of 3 · MIT License
+**Version 3.1.0** · Layer 1 of 3 · MIT License
 
 ---
 
-## What v3 fixes
+## What v3.1 fixes
+
+v3.0 rebuilt the compass for reliability but shipped a critical error in the ground-footprint geometry, plus one incomplete fix from its own changelog.
+
+| # | Bug | Symptom | Fix |
+|---|-----|---------|-----|
+| 1 | `calcFP()` used `S.alt` (GPS altitude above **sea level**) as the camera's height above **ground** | At ~650 m elevation every footprint came out ~430x too large — a 2.7 m plot exported as a 1.2 km polygon, making Layer 2 pixel sampling meaningless | Camera height is now `S.camH`, set per session on the start screen (default 1.5 m) and exported as `camera_height_m` |
+| 2 | Tilt was `Math.abs(e.beta \|\| 45)` | In landscape a phone aimed 45° down reported FLAT; a phone aimed at the sky was indistinguishable from one aimed at the crop; a genuine `beta === 0` was silently rewritten to 45° | Tilt is derived from `beta` **and** `gamma` as `acos(cos β · cos γ)` — the true rear-camera angle from nadir, orientation-independent and sign-aware |
+| 3 | `S.gotAbsolute = true` ran *above* the `alpha === null` check | One malformed `deviceorientationabsolute` event latched the flag forever and permanently blocked the relative-event fallback — the v3.0 changelog claimed this was fixed, but the code still latched on the bare event | The flag now latches only on a reading that has actually validated |
+| 4 | Compass rose rotated by `S.az` (compass only) while the map cone and exports used `S.heading` (fused) | Under `GPS MOVE` the rose and the cone pointed in different directions | Both now read the fused heading |
+| 5 | Footprint width used ground range instead of slant range; depth was `gd·tan(v)`; vertical FOV was `hFOV × 9/16`; degenerate results fell back to `\|\| 5` / `\|\| 3` | Systematically undersized footprints and fabricated dimensions where the geometry was undefined | Width uses slant range `√(H²+r²)`, depth is the true near-to-far spread `H(tan(t+v/2) − tan(t−v/2))`, vertical FOV is derived through the tangent, and an at-or-above-horizon aim returns `null` and blocks capture instead of inventing numbers |
+
+**Breaking change for downstream consumers:** exports now carry `camera_height_m`, and `tilt_deg` is duplicated as `tilt_deg_from_nadir` to make the convention explicit (0° = straight down, 90° = horizon). Footprint polygons captured with v3.0 are not trustworthy and should be re-collected.
+
+---
+
+## What v3.0 fixed
 
 The FOV cone (and compass rose) used to freeze or drift on some phones, intermittently. v2 already fixed the Android mirroring bug and added GPS-bearing fusion — but the code still trusted every sensor event blindly. Three real DeviceOrientation quirks fell through:
 
