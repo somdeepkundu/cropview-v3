@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0a0f1e" id="meta-theme"/>
+<title>CropView — Look Angle Mapper</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+ 
+<style>
+/* ── CSS Variables (themes) ─────────────────────────── */
+:root {
+  --bg:        #0a0f1e;
+  --surface:   #111827;
+  --surface2:  #1a2537;
+  --border:    #1e2d45;
+  --accent:    #22d3ee;
+  --accent2:   #0ea5e9;
+  --text:      #f0f4f8;
+  --muted:     #64748b;
+  --muted2:    #94a3b8;
+  --success:   #34d399;
+  --warn:      #f59e0b;
+  --danger:    #f87171;
+  --radius:    10px;
+  --shadow:    0 8px 32px rgba(0,0,0,.45);
+  --panel-w:   320px;
+}
+[data-theme="light"] {
+  --bg:        #f0f5fb;
+  --surface:   #ffffff;
+  --surface2:  #e8f0fe;
+  --border:    #d1daea;
+  --accent:    #0284c7;
+  --accent2:   #0ea5e9;
+  --text:      #0f172a;
+  --muted:     #475569;
+  --muted2:    #64748b;
+  --shadow:    0 4px 20px rgba(0,0,0,.12);
+}
+ 
+/* ── Reset ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;
+  transition:background .25s,color .25s;
+}
+ 
+/* ── Top bar ─────────────────────────────────────────── */
+#topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:0 16px;height:52px;min-height:52px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  z-index:9999;position:relative;
+  box-shadow:0 1px 8px rgba(0,0,0,.2);
+}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.logo-icon{
+  width:30px;height:30px;border-radius:7px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.logo-text{font-size:.9rem;font-weight:700;color:var(--text);line-height:1.1;}
+.logo-text small{display:block;font-size:.63rem;font-weight:400;color:var(--muted);letter-spacing:.5px;}
+.spacer{flex:1}
+ 
+/* top-bar buttons */
+.tb-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:8px;padding:6px 12px;
+  font-size:.77rem;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  white-space:nowrap;transition:background .15s,border-color .15s;
+}
+.tb-btn:hover{background:var(--border);border-color:var(--accent)}
+.tb-btn svg{flex-shrink:0}
+#btn-toggle-panel{display:none}
+ 
+/* theme toggle */
+#theme-btn{
+  width:36px;height:36px;border-radius:8px;padding:0;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+ 
+/* file pill */
+#file-pill{
+  background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.3);
+  color:var(--accent);border-radius:20px;padding:3px 10px;
+  font-size:.72rem;font-weight:600;display:none;align-items:center;gap:5px;
+  max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+ 
+/* ── Main layout ─────────────────────────────────────── */
+#main{flex:1;display:flex;overflow:hidden;position:relative}
+ 
+/* ── Side panel ──────────────────────────────────────── */
+#panel{
+  width:var(--panel-w);min-width:var(--panel-w);
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  z-index:100;
+}
+#panel-inner{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 20px 0;}
+#panel-inner::-webkit-scrollbar{width:4px}
+#panel-inner::-webkit-scrollbar-track{background:transparent}
+#panel-inner::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+ 
+/* section headers */
+.p-section{padding:14px 16px 0}
+.p-label{
+  font-size:.66rem;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:6px;margin-bottom:10px;
+  padding-bottom:6px;border-bottom:1px solid var(--border);
+}
+ 
+/* ── Upload zone ─────────────────────────────────────── */
+#drop-zone{
+  margin:14px 16px 0;border:2px dashed var(--border);
+  border-radius:var(--radius);padding:22px 16px;
+  text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;
+  position:relative;overflow:hidden;
+  background:var(--surface2);
+}
+#drop-zone:hover,#drop-zone.drag-over{
+  border-color:var(--accent);background:rgba(34,211,238,.07);
+}
+#drop-zone .dz-icon{font-size:2rem;margin-bottom:8px;display:block;}
+#drop-zone .dz-title{font-size:.85rem;font-weight:600;color:var(--text);margin-bottom:3px;}
+#drop-zone .dz-sub{font-size:.72rem;color:var(--muted);}
+#file-input{display:none}
+ 
+/* scan-line animation on drop zone */
+#drop-zone::after{
+  content:'';position:absolute;left:0;top:-100%;width:100%;height:40%;
+  background:linear-gradient(to bottom,transparent,rgba(34,211,238,.06),transparent);
+  animation:scan 3s ease-in-out infinite;
+}
+@keyframes scan{0%,100%{top:-40%}50%{top:120%}}
+ 
+/* ── Column mapping ──────────────────────────────────── */
+#col-map-wrap{display:none}
+.col-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.col-row label{font-size:.75rem;color:var(--muted2);width:70px;flex-shrink:0}
+.col-row select{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:5px 8px;font-size:.75rem;
+  cursor:pointer;outline:none;
+}
+.col-row select:focus{border-color:var(--accent)}
+ 
+/* ── Rotation controls ───────────────────────────────── */
+.rot-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.preset-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--muted2);border-radius:7px;padding:5px 10px;
+  font-size:.75rem;font-weight:600;cursor:pointer;
+  transition:all .15s;flex:1;min-width:50px;text-align:center;
+}
+.preset-btn.active,.preset-btn:hover{
+  background:var(--accent);border-color:var(--accent);color:#000;
+}
+.custom-rot{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.custom-rot input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:5px 10px;font-size:.82rem;
+  outline:none;text-align:center;
+}
+.custom-rot input:focus{border-color:var(--accent)}
+.custom-rot span{font-size:.75rem;color:var(--muted);flex-shrink:0}
+ 
+/* direction toggle */
+.dir-toggle{
+  display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  margin-bottom:14px;
+}
+.dir-btn{
+  flex:1;padding:7px;font-size:.77rem;font-weight:600;
+  background:var(--surface2);border:none;color:var(--muted2);
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;
+  justify-content:center;gap:5px;
+}
+.dir-btn.active{background:var(--accent);color:#000;}
+.dir-btn:first-child{border-right:1px solid var(--border);}
+ 
+/* ── Map toggles ─────────────────────────────────────── */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.toggle-row span{font-size:.78rem;color:var(--muted2);}
+.switch{position:relative;display:inline-block;width:36px;height:20px;}
+.switch input{opacity:0;width:0;height:0}
+.slider{
+  position:absolute;inset:0;background:var(--border);border-radius:20px;
+  cursor:pointer;transition:.2s;
+}
+.slider::before{
+  content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;
+  background:#fff;border-radius:50%;transition:.2s;
+}
+.switch input:checked + .slider{background:var(--accent);}
+.switch input:checked + .slider::before{transform:translateX(16px);}
+ 
+/* arrow length */
+.range-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.range-row span{font-size:.75rem;color:var(--muted2);flex-shrink:0}
+.range-row input{flex:1;accent-color:var(--accent);}
+.range-val{font-size:.75rem;color:var(--accent);font-weight:700;min-width:34px;text-align:right;}
+ 
+/* ── Stats cards ─────────────────────────────────────── */
+#stats-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;
+  padding:0 16px;
+}
+.stat-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:8px 10px;
+}
+.stat-card .sk{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.stat-card .sv{font-size:1rem;font-weight:700;color:var(--text);margin-top:2px;}
+ 
+/* ── Download button ─────────────────────────────────── */
+#btn-download{
+  display:none;width:calc(100% - 32px);margin:14px 16px 0;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none;color:#000;border-radius:var(--radius);padding:11px;
+  font-size:.85rem;font-weight:700;cursor:pointer;
+  display:none;align-items:center;justify-content:center;gap:7px;
+  transition:opacity .2s,transform .1s;
+}
+#btn-download:active{transform:scale(.98);opacity:.9}
+ 
+/* ── Map container ───────────────────────────────────── */
+#map-wrap{flex:1;position:relative;background:#0a0e1a;}
+#map{width:100%;height:100%}
+ 
+/* ── Empty state ─────────────────────────────────────── */
+#empty-state{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;
+  color:var(--muted);pointer-events:none;z-index:10;
+}
+#empty-state .es-icon{font-size:3.5rem;opacity:.3}
+#empty-state p{font-size:.85rem;opacity:.5;text-align:center;max-width:200px;}
+ 
+/* ── Error toast ─────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--danger);color:#fff;padding:10px 20px;border-radius:8px;
+  font-size:.82rem;font-weight:600;z-index:99999;
+  transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;
+  max-width:90vw;text-align:center;
+}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+ 
+/* ── Popup styling ───────────────────────────────────── */
+.leaflet-popup-content-wrapper{
+  background:var(--surface)!important;border:1px solid var(--border)!important;
+  border-radius:10px!important;color:var(--text)!important;
+  box-shadow:var(--shadow)!important;
+}
+.leaflet-popup-tip{background:var(--surface)!important;}
+.popup-inner{min-width:200px;}
+.popup-inner h3{font-size:.82rem;color:var(--accent);margin-bottom:7px;
+  border-bottom:1px solid var(--border);padding-bottom:5px;}
+.popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.pf{background:var(--surface2);border-radius:6px;padding:5px 8px;}
+.pf .pk{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.pf .pv{font-size:.85rem;font-weight:700;margin-top:1px;}
+ 
+/* ── Leaflet dark tiles ──────────────────────────────── */
+[data-theme="dark"] .leaflet-tile{filter:brightness(.85) saturate(.9);}
+ 
+/* ── Mobile overrides ────────────────────────────────── */
+@media(max-width:700px){
+  :root{--panel-w:100%}
+  #main{flex-direction:column}
+  #panel{
+    width:100%;min-width:100%;
+    border-right:none;border-bottom:1px solid var(--border);
+    height:auto;max-height:55vh;
+    position:absolute;left:0;bottom:0;top:auto;
+    border-radius:16px 16px 0 0;
+    transform:translateY(100%);
+    z-index:500;
+  }
+  #panel.open{transform:translateY(0);}
+  #map-wrap{height:100%;flex:1}
+  #btn-toggle-panel{display:flex!important}
+ 
+  /* drag handle */
+  #panel::before{
+    content:'';display:block;width:36px;height:4px;
+    background:var(--border);border-radius:4px;
+    margin:10px auto 6px;flex-shrink:0;
+  }
+}
+</style>
+</head>
+<body>
+ 
+<!-- ── Top bar ──────────────────────────────────────── -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-icon">🌾</div>
+    <div class="logo-text">CropView<small>Look Angle Mapper</small></div>
+  </div>
+  <div class="spacer"></div>
+  <div id="file-pill">📄 <span id="file-name-pill">—</span></div>
+  <button class="tb-btn" id="btn-new" style="display:none"
+    onclick="resetApp()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+    </svg>New
+  </button>
+  <button class="tb-btn" id="btn-toggle-panel" onclick="togglePanel()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>Controls
+  </button>
+  <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+</div>
+ 
+<!-- ── Main ─────────────────────────────────────────── -->
+<div id="main">
+ 
+  <!-- ── Panel ──────────────────────────────────────── -->
+  <div id="panel">
+    <div id="panel-inner">
+ 
+      <!-- Upload -->
+      <div class="p-section">
+        <div class="p-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Upload Excel
+        </div>
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+          ondragover="e=>{e.preventDefault();e.currentTarget.classList.add('drag-over')}"
+          ondragleave="e=>e.currentTarget.classList.remove('drag-over')"
+          ondrop="handleDrop(event)">
+          <span class="dz-icon">📊</span>
+          <div class="dz-title">Drop .xlsx / .xls here</div>
+          <div class="dz-sub">or click to browse</div>
+        </div>
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv"
+          onchange="handleFile(this.files[0])"/>
+      </div>
+ 
+      <!-- Column mapping -->
+      <div id="col-map-wrap" class="p-section" style="margin-top:14px">
+        <div class="p-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+          Column Mapping
+        </div>
+        <div id="col-rows"></div>
+        <button class="tb-btn" style="width:100%;justify-content:center;margin-top:4px"
+          onclick="applyMapping()">Apply &amp; Render Map</button>
+      </div>
+ 
+      <!-- Rotation controls -->
+      <div class="p-section" style="margin-top:14px">
+        <div class="p-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+          </svg>
+          Rotation Offset
+        </div>
+ 
+        <!-- Presets -->
+        <div class="rot-presets">
+          <button class="preset-btn active" data-val="0"   onclick="setPreset(this)">0°</button>
+          <button class="preset-btn"        data-val="45"  onclick="setPreset(this)">45°</button>
+          <button class="preset-btn"        data-val="90"  onclick="setPreset(this)">90°</button>
+          <button class="preset-btn"        data-val="135" onclick="setPreset(this)">135°</button>
+          <button class="preset-btn"        data-val="180" onclick="setPreset(this)">180°</button>
+        </div>
+ 
+        <!-- Custom -->
+        <div class="custom-rot">
+          <input type="number" id="custom-deg" min="0" max="360" placeholder="Custom °"
+            oninput="setCustom(this.value)"/>
+          <span>degrees</span>
+        </div>
+ 
+        <!-- Direction -->
+        <div class="dir-toggle">
+          <button class="dir-btn active" id="dir-ccw" onclick="setDir('ccw')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            </svg>Anti-clockwise
+          </button>
+          <button class="dir-btn" id="dir-cw" onclick="setDir('cw')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/>
+            </svg>Clockwise
+          </button>
+        </div>
+      </div>
+ 
+      <!-- Map display toggles -->
+      <div class="p-section" style="margin-top:2px">
+        <div class="p-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+            <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+          </svg>
+          Map Layers
+        </div>
+        <div class="toggle-row">
+          <span>FOV cone</span>
+          <label class="switch"><input type="checkbox" id="tog-fov" checked onchange="redraw()"/><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span>Azimuth arrow</span>
+          <label class="switch"><input type="checkbox" id="tog-arrow" checked onchange="redraw()"/><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span>Capture path</span>
+          <label class="switch"><input type="checkbox" id="tog-path" checked onchange="redraw()"/><span class="slider"></span></label>
+        </div>
+        <div class="range-row">
+          <span>Arrow length</span>
+          <input type="range" id="sl-len" min="20" max="400" value="80" oninput="onLen(this)"/>
+          <span class="range-val" id="sl-len-v">80m</span>
+        </div>
+        <div class="range-row">
+          <span>Color by</span>
+          <select style="flex:1;background:var(--surface2);border:1px solid var(--border);
+            color:var(--text);border-radius:6px;padding:4px 8px;font-size:.75rem;cursor:pointer"
+            id="sel-color" onchange="redraw()">
+            <option value="azimuth">Azimuth</option>
+            <option value="tilt">Tilt</option>
+            <option value="altitude">Altitude</option>
+            <option value="index">Index</option>
+          </select>
+        </div>
+      </div>
+ 
+      <!-- Stats -->
+      <div class="p-section" style="margin-top:14px">
+        <div class="p-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          Summary
+        </div>
+        <div id="stats-grid">
+          <div class="stat-card"><div class="sk">Points</div><div class="sv" id="st-pts">—</div></div>
+          <div class="stat-card"><div class="sk">Avg Azimuth</div><div class="sv" id="st-az">—</div></div>
+          <div class="stat-card"><div class="sk">Avg Tilt</div><div class="sv" id="st-tilt">—</div></div>
+          <div class="stat-card"><div class="sk">Avg Alt</div><div class="sv" id="st-alt">—</div></div>
+        </div>
+      </div>
+ 
+      <!-- Download -->
+      <button id="btn-download" onclick="downloadMap()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download Map HTML
+      </button>
+ 
+    </div><!-- /panel-inner -->
+  </div><!-- /panel -->
+ 
+  <!-- ── Map ────────────────────────────────────────── -->
+  <div id="map-wrap">
+    <div id="empty-state">
+      <div class="es-icon">🗺️</div>
+      <p>Upload an Excel file to visualise captures on the map</p>
+    </div>
+    <div id="map"></div>
+  </div>
+ 
+</div><!-- /main -->
+ 
+<!-- Toast -->
+<div id="toast"></div>
+ 
+<!-- ══════════════════════════════════════════════════ -->
+<script>
+// ── State ─────────────────────────────────────────────
+let captures    = [];
+let rotOffset   = 0;
+let rotDir      = 'ccw';   // 'cw' | 'ccw'
+let arrowLen    = 80;
+let colorMode   = 'azimuth';
+let mapInited   = false;
+let theMap, gFov, gArrow, gPath, gPoints;
+let currentFileName = '';
+ 
+// ── Theme ─────────────────────────────────────────────
+let isDark = true;
+function toggleTheme(){
+  isDark = !isDark;
+  document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+  document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+  document.getElementById('meta-theme').content = isDark ? '#0a0f1e' : '#f0f5fb';
+}
+ 
+// ── Panel (mobile) ────────────────────────────────────
+function togglePanel(){
+  document.getElementById('panel').classList.toggle('open');
+}
+ 
+// ── Toast ─────────────────────────────────────────────
+function toast(msg, ms=3500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+ 
+// ── Reset ─────────────────────────────────────────────
+function resetApp(){
+  captures=[]; rotOffset=0; rotDir='ccw'; arrowLen=80; colorMode='azimuth';
+  document.getElementById('file-pill').style.display='none';
+  document.getElementById('btn-new').style.display='none';
+  document.getElementById('btn-download').style.display='none';
+  document.getElementById('col-map-wrap').style.display='none';
+  document.getElementById('empty-state').style.display='flex';
+  document.getElementById('file-input').value='';
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.toggle('active',b.dataset.val==='0'));
+  document.getElementById('dir-ccw').classList.add('active');
+  document.getElementById('dir-cw').classList.remove('active');
+  document.getElementById('custom-deg').value='';
+  if(gFov)    {gFov.clearLayers();gArrow.clearLayers();gPath.clearLayers();gPoints.clearLayers();}
+  updateStats();
+}
+ 
+// ── File handling ─────────────────────────────────────
+function handleDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+}
+ 
+function handleFile(file){
+  if(!file) return;
+  if(!/\.(xlsx|xls|csv)$/i.test(file.name)){
+    toast('Please upload an .xlsx, .xls, or .csv file'); return;
+  }
+  currentFileName = file.name.replace(/\.[^.]+$/, '');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){ toast('Sheet appears empty'); return; }
+      buildColumnUI(rows);
+      document.getElementById('file-pill').style.display='flex';
+      document.getElementById('file-name-pill').textContent = file.name;
+      document.getElementById('btn-new').style.display='flex';
+    } catch(err){ toast('Could not read file: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+ 
+// ── Column mapping UI ─────────────────────────────────
+const FIELDS = [
+  { key:'lat',     label:'Latitude',  hint:['lat','latitude'] },
+  { key:'lon',     label:'Longitude', hint:['lon','lng','longitude'] },
+  { key:'azimuth', label:'Azimuth',   hint:['azimuth','azimuth_deg','bearing','az'] },
+  { key:'tilt',    label:'Tilt',      hint:['tilt','tilt_deg','pitch','elevation'] },
+  { key:'hfov',    label:'HFOV',      hint:['hfov','hfov_deg','fov','field_of_view'] },
+  { key:'altitude',label:'Altitude',  hint:['altitude','alt','height'] },
+  { key:'id',      label:'ID',        hint:['id','name','imgname','capture_id'] },
+];
+let rawRows = [];
+ 
+function bestGuess(cols, hints){
+  for(const h of hints){
+    const m = cols.find(c => c.toLowerCase().replace(/[^a-z0-9]/g,'') === h.replace(/[^a-z0-9]/g,''));
+    if(m) return m;
+  }
+  return '';
+}
+ 
+function buildColumnUI(rows){
+  rawRows = rows;
+  const cols = Object.keys(rows[0]);
+  const container = document.getElementById('col-rows');
+  container.innerHTML = '';
+  FIELDS.forEach(f => {
+    const guess = bestGuess(cols, f.hint);
+    const row = document.createElement('div');
+    row.className = 'col-row';
+    row.innerHTML = `<label>${f.label}</label>
+      <select data-field="${f.key}">
+        <option value="">(skip)</option>
+        ${cols.map(c=>`<option value="${c}"${c===guess?' selected':''}>${c}</option>`).join('')}
+      </select>`;
+    container.appendChild(row);
+  });
+  document.getElementById('col-map-wrap').style.display = 'block';
+  // Auto-render if guesses look good
+  if(bestGuess(cols,['lat','latitude']) && bestGuess(cols,['lon','lng','longitude'])){
+    applyMapping();
+  }
+}
+ 
+function applyMapping(){
+  const selects = document.querySelectorAll('[data-field]');
+  const map = {};
+  selects.forEach(s => { if(s.value) map[s.dataset.field] = s.value; });
+  if(!map.lat || !map.lon){ toast('Latitude and Longitude columns are required'); return; }
+ 
+  captures = rawRows.map((r,i) => ({
+    id:       r[map.id]       ?? `PT-${i+1}`,
+    lat:      parseFloat(r[map.lat])     || 0,
+    lon:      parseFloat(r[map.lon])     || 0,
+    azimuth:  parseFloat(r[map.azimuth]) || 0,
+    tilt:     parseFloat(r[map.tilt])    || 0,
+    hfov:     parseFloat(r[map.hfov])    || 65,
+    alt:      parseFloat(r[map.altitude])|| 0,
+  })).filter(c => c.lat !== 0 || c.lon !== 0);
+ 
+  if(!captures.length){ toast('No valid lat/lon rows found'); return; }
+  initMap();
+  redraw();
+  updateStats();
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('btn-download').style.display = 'flex';
+  // close panel on mobile after render
+  if(window.innerWidth <= 700) document.getElementById('panel').classList.remove('open');
+}
+ 
+// ── Map init ──────────────────────────────────────────
+function initMap(){
+  if(!mapInited){
+    const center = [
+      captures.reduce((s,c)=>s+c.lat,0)/captures.length,
+      captures.reduce((s,c)=>s+c.lon,0)/captures.length,
+    ];
+    theMap = L.map('map').setView(center, 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom:20
+    }).addTo(theMap);
+    gFov    = L.layerGroup().addTo(theMap);
+    gArrow  = L.layerGroup().addTo(theMap);
+    gPath   = L.layerGroup().addTo(theMap);
+    gPoints = L.layerGroup().addTo(theMap);
+    mapInited = true;
+  } else {
+    const center = [
+      captures.reduce((s,c)=>s+c.lat,0)/captures.length,
+      captures.reduce((s,c)=>s+c.lon,0)/captures.length,
+    ];
+    theMap.setView(center, 15);
+  }
+}
+ 
+// ── Geo helpers ───────────────────────────────────────
+function destPt(lat,lon,bearDeg,distM){
+  const R=6371000, δ=distM/R, θ=bearDeg*Math.PI/180;
+  const φ1=lat*Math.PI/180, λ1=lon*Math.PI/180;
+  const φ2=Math.asin(Math.sin(φ1)*Math.cos(δ)+Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2=λ1+Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1),Math.cos(δ)-Math.sin(φ1)*Math.sin(φ2));
+  return [φ2*180/Math.PI,λ2*180/Math.PI];
+}
+ 
+function getColor(c){
+  const mode = colorMode;
+  const vals = captures.map(x =>
+    mode==='azimuth'  ? x.azimuth :
+    mode==='tilt'     ? x.tilt    :
+    mode==='altitude' ? x.alt     : captures.indexOf(x));
+  const min=Math.min(...vals), max=Math.max(...vals);
+  const v = mode==='azimuth'  ? c.azimuth :
+            mode==='tilt'     ? c.tilt    :
+            mode==='altitude' ? c.alt     : captures.indexOf(c);
+  const t = max===min ? 0.5 : (v-min)/(max-min);
+  return `hsl(${240-240*t},85%,55%)`;
+}
+ 
+function effectiveAz(az){
+  return rotDir==='ccw' ? az - rotOffset : az + rotOffset;
+}
+ 
+// ── Redraw ────────────────────────────────────────────
+function redraw(){
+  if(!theMap) return;
+  const showFov   = document.getElementById('tog-fov').checked;
+  const showArrow = document.getElementById('tog-arrow').checked;
+  const showPath  = document.getElementById('tog-path').checked;
+  colorMode = document.getElementById('sel-color').value;
+ 
+  gFov.clearLayers(); gArrow.clearLayers();
+  gPath.clearLayers(); gPoints.clearLayers();
+ 
+  // path
+  if(showPath && captures.length>1){
+    L.polyline(captures.map(c=>[c.lat,c.lon]),{
+      color:'#475569',weight:2,dashArray:'6 5',opacity:.7
+    }).addTo(gPath);
+  }
+ 
+  captures.forEach((c,i) => {
+    const col = getColor(c);
+    const eaz = effectiveAz(c.azimuth);
+ 
+    // FOV cone
+    if(showFov){
+      const half = c.hfov/2;
+      const pts  = [[c.lat,c.lon]];
+      for(let s=0;s<=20;s++) pts.push(destPt(c.lat,c.lon,eaz-half+(c.hfov*s/20),arrowLen*1.5));
+      pts.push([c.lat,c.lon]);
+      L.polygon(pts,{color:col,fillColor:col,fillOpacity:.15,weight:1,opacity:.5}).addTo(gFov);
+    }
+ 
+    // Arrow
+    if(showArrow){
+      const tip = destPt(c.lat,c.lon,eaz,arrowLen);
+      L.polyline([[c.lat,c.lon],tip],{color:col,weight:2.5,opacity:.9}).addTo(gArrow);
+      const lh = destPt(tip[0],tip[1],eaz+150,arrowLen*.18);
+      const rh = destPt(tip[0],tip[1],eaz-150,arrowLen*.18);
+      L.polygon([tip,lh,rh],{color:col,fillColor:col,fillOpacity:1,weight:0}).addTo(gArrow);
+    }
+ 
+    // Marker
+    const mk = L.circleMarker([c.lat,c.lon],{
+      radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:.95
+    }).addTo(gPoints);
+    L.marker([c.lat,c.lon],{
+      icon:L.divIcon({
+        html:`<div style="width:14px;height:14px;line-height:14px;text-align:center;font-size:8px;font-weight:700;color:#fff">${i+1}</div>`,
+        className:'',iconAnchor:[7,7]
+      })
+    }).addTo(gPoints);
+ 
+    mk.bindPopup(`
+      <div class="popup-inner">
+        <h3>#${i+1} &nbsp; ${c.id}</h3>
+        <div class="popup-grid">
+          <div class="pf"><div class="pk">Lat</div><div class="pv">${c.lat.toFixed(6)}</div></div>
+          <div class="pf"><div class="pk">Lon</div><div class="pv">${c.lon.toFixed(6)}</div></div>
+          <div class="pf"><div class="pk">Azimuth</div><div class="pv" style="color:#f59e0b">${c.azimuth}°</div></div>
+          <div class="pf"><div class="pk">Tilt</div><div class="pv" style="color:#34d399">${c.tilt}°</div></div>
+          <div class="pf"><div class="pk">HFOV</div><div class="pv" style="color:#a78bfa">${c.hfov}°</div></div>
+          <div class="pf"><div class="pk">Altitude</div><div class="pv" style="color:#38bdf8">${c.alt.toFixed?c.alt.toFixed(1):c.alt} m</div></div>
+        </div>
+      </div>`,{maxWidth:280});
+  });
+}
+ 
+// ── Rotation controls ─────────────────────────────────
+function setPreset(btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  rotOffset = +btn.dataset.val;
+  document.getElementById('custom-deg').value = '';
+  redraw();
+}
+function setCustom(v){
+  const deg = parseFloat(v);
+  if(isNaN(deg)) return;
+  rotOffset = ((deg % 360) + 360) % 360;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  redraw();
+}
+function setDir(d){
+  rotDir = d;
+  document.getElementById('dir-ccw').classList.toggle('active', d==='ccw');
+  document.getElementById('dir-cw').classList.toggle('active',  d==='cw');
+  redraw();
+}
+ 
+// ── Arrow length ──────────────────────────────────────
+function onLen(el){
+  arrowLen = +el.value;
+  document.getElementById('sl-len-v').textContent = arrowLen + 'm';
+  redraw();
+}
+ 
+// ── Stats ─────────────────────────────────────────────
+function avg(arr){ return arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : '—'; }
+function updateStats(){
+  document.getElementById('st-pts').textContent  = captures.length || '—';
+  document.getElementById('st-az').textContent   = captures.length ? avg(captures.map(c=>c.azimuth))+'°' : '—';
+  document.getElementById('st-tilt').textContent = captures.length ? avg(captures.map(c=>c.tilt))+'°'    : '—';
+  document.getElementById('st-alt').textContent  = captures.length ? avg(captures.map(c=>c.alt))+'m'     : '—';
+}
+ 
+// ── Download: generate standalone HTML ───────────────
+function downloadMap(){
+  if(!captures.length){ toast('No data to export'); return; }
+  const html = generateMapHTML();
+  const blob = new Blob([html],{type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (currentFileName||'captures') + '_map.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+ 
+function generateMapHTML(){
+  const cData   = JSON.stringify(captures);
+  const offset  = rotOffset;
+  const dir     = rotDir;
+  const len     = arrowLen;
+  const colMode = colorMode;
+  const showFov   = document.getElementById('tog-fov').checked;
+  const showArrow = document.getElementById('tog-arrow').checked;
+  const showPath  = document.getElementById('tog-path').checked;
+  const center  = [
+    captures.reduce((s,c)=>s+c.lat,0)/captures.length,
+    captures.reduce((s,c)=>s+c.lon,0)/captures.length,
+  ];
+ 
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${currentFileName||'Captures'} – CropView Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:system-ui,sans-serif;background:#0a0f1e;color:#f0f4f8}
+#bar{height:48px;background:#111827;border-bottom:1px solid #1e2d45;display:flex;align-items:center;padding:0 16px;gap:10px;}
+#bar h1{font-size:.9rem;font-weight:700;color:#f0f4f8}
+#bar h1 span{color:#22d3ee}
+.badge{background:#1e40af;color:#bfdbfe;font-size:.7rem;padding:2px 8px;border-radius:20px;font-weight:600}
+#ctrl{background:#111827;border-bottom:1px solid #1e2d45;padding:7px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+#ctrl label{font-size:.73rem;color:#94a3b8}
+#ctrl input[type=checkbox]{accent-color:#22d3ee}
+#ctrl input[type=range]{accent-color:#22d3ee;width:100px}
+#ctrl select{background:#0f172a;color:#f0f4f8;border:1px solid #1e2d45;border-radius:6px;padding:3px 6px;font-size:.73rem}
+#map{height:calc(100vh - 48px - 42px)}
+.leaflet-popup-content-wrapper{background:#111827!important;border:1px solid #1e2d45!important;border-radius:10px!important;color:#f0f4f8!important}
+.leaflet-popup-tip{background:#111827!important}
+.pi h3{font-size:.8rem;color:#22d3ee;margin-bottom:6px;border-bottom:1px solid #1e2d45;padding-bottom:4px}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pf{background:#0f172a;border-radius:6px;padding:4px 7px}
+.pk{font-size:.6rem;color:#475569;text-transform:uppercase}
+.pv{font-size:.82rem;font-weight:700}
+#rot-info{position:fixed;bottom:14px;left:14px;background:rgba(10,15,30,.9);border:1px solid #1e2d45;border-radius:8px;padding:8px 12px;font-size:.72rem;color:#94a3b8;z-index:1000}
+#rot-info strong{color:#22d3ee}
+</style>
+</head><body>
+<div id="bar">
+  <h1>🌾 CropView — <span>${currentFileName||'Captures'}</span></h1>
+  <span class="badge">${captures.length} captures</span>
+  <span style="flex:1"></span>
+  <span style="font-size:.72rem;color:#475569">Rotation: ${offset}° ${dir==='ccw'?'CCW':'CW'}</span>
+</div>
+<div id="ctrl">
+  <label><input type="checkbox" id="c-fov" ${showFov?'checked':''}   onchange="redraw()"> FOV cone</label>
+  <label><input type="checkbox" id="c-arr" ${showArrow?'checked':''} onchange="redraw()"> Arrow</label>
+  <label><input type="checkbox" id="c-pth" ${showPath?'checked':''}  onchange="redraw()"> Path</label>
+  <label>Length <input type="range" id="sl" min="20" max="400" value="${len}" oninput="al=+this.value;document.getElementById('sv').textContent=al+'m';redraw()"> <span id="sv">${len}m</span></label>
+  <label>Color <select id="sc" onchange="redraw()"><option value="azimuth"${colMode==='azimuth'?' selected':''}>Azimuth</option><option value="tilt"${colMode==='tilt'?' selected':''}>Tilt</option><option value="altitude"${colMode==='altitude'?' selected':''}>Alt</option><option value="index"${colMode==='index'?' selected':''}>Index</option></select></label>
+</div>
+<div id="map"></div>
+<div id="rot-info">Rotation offset: <strong>${offset}° ${dir==='ccw'?'anti-clockwise':'clockwise'}</strong></div>
+<script>
+const CAP=${cData};
+let al=${len};
+function dp(la,lo,b,d){
+  const R=6371000,δ=d/R,θ=b*Math.PI/180,φ1=la*Math.PI/180,λ1=lo*Math.PI/180;
+  const φ2=Math.asin(Math.sin(φ1)*Math.cos(δ)+Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2=λ1+Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1),Math.cos(δ)-Math.sin(φ1)*Math.sin(φ2));
+  return[φ2*180/Math.PI,λ2*180/Math.PI];
+}
+function gc(c){
+  const m=document.getElementById('sc').value;
+  const vs=CAP.map(x=>m==='azimuth'?x.azimuth:m==='tilt'?x.tilt:m==='altitude'?x.alt:CAP.indexOf(x));
+  const mn=Math.min(...vs),mx=Math.max(...vs);
+  const v=m==='azimuth'?c.azimuth:m==='tilt'?c.tilt:m==='altitude'?c.alt:CAP.indexOf(c);
+  const t=mx===mn?.5:(v-mn)/(mx-mn);
+  return \`hsl(\${240-240*t},85%,55%)\`;
+}
+function eaz(az){return ${dir==='ccw'?'az-'+offset:'az+'+offset};}
+const m=L.map('map').setView([${center[0]},${center[1]}],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:20}).addTo(m);
+let gF=L.layerGroup().addTo(m),gA=L.layerGroup().addTo(m),gP=L.layerGroup().addTo(m),gK=L.layerGroup().addTo(m);
+function redraw(){
+  gF.clearLayers();gA.clearLayers();gP.clearLayers();gK.clearLayers();
+  if(document.getElementById('c-pth').checked&&CAP.length>1)
+    L.polyline(CAP.map(c=>[c.lat,c.lon]),{color:'#475569',weight:2,dashArray:'6 5',opacity:.7}).addTo(gP);
+  CAP.forEach((c,i)=>{
+    const col=gc(c),az=eaz(c.azimuth),half=c.hfov/2;
+    if(document.getElementById('c-fov').checked){
+      const pts=[[c.lat,c.lon]];
+      for(let s=0;s<=20;s++)pts.push(dp(c.lat,c.lon,az-half+(c.hfov*s/20),al*1.5));
+      pts.push([c.lat,c.lon]);
+      L.polygon(pts,{color:col,fillColor:col,fillOpacity:.15,weight:1,opacity:.5}).addTo(gF);
+    }
+    if(document.getElementById('c-arr').checked){
+      const t=dp(c.lat,c.lon,az,al);
+      L.polyline([[c.lat,c.lon],t],{color:col,weight:2.5,opacity:.9}).addTo(gA);
+      L.polygon([t,dp(t[0],t[1],az+150,al*.18),dp(t[0],t[1],az-150,al*.18)],{color:col,fillColor:col,fillOpacity:1,weight:0}).addTo(gA);
+    }
+    const mk=L.circleMarker([c.lat,c.lon],{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:.95}).addTo(gK);
+    L.marker([c.lat,c.lon],{icon:L.divIcon({html:\`<div style="width:14px;height:14px;line-height:14px;text-align:center;font-size:8px;font-weight:700;color:#fff">\${i+1}</div>\`,className:'',iconAnchor:[7,7]})}).addTo(gK);
+    mk.bindPopup(\`<div class="pi"><h3>#\${i+1} \${c.id}</h3><div class="pg">
+      <div class="pf"><div class="pk">Lat</div><div class="pv">\${c.lat.toFixed(6)}</div></div>
+      <div class="pf"><div class="pk">Lon</div><div class="pv">\${c.lon.toFixed(6)}</div></div>
+      <div class="pf"><div class="pk">Azimuth</div><div class="pv" style="color:#f59e0b">\${c.azimuth}°</div></div>
+      <div class="pf"><div class="pk">Tilt</div><div class="pv" style="color:#34d399">\${c.tilt}°</div></div>
+      <div class="pf"><div class="pk">HFOV</div><div class="pv" style="color:#a78bfa">\${c.hfov}°</div></div>
+      <div class="pf"><div class="pk">Alt</div><div class="pv" style="color:#38bdf8">\${typeof c.alt==='number'?c.alt.toFixed(1):c.alt} m</div></div>
+    </div></div>\`,{maxWidth:260});
+  });
+}
+redraw();
+<\/script>
+</body></html>`;
+}
+</script>
+</body>
+</html>

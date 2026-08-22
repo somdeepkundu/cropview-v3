@@ -1,0 +1,10 @@
+{
+  "name": "cropview-v3",
+  "version": "3.0.0",
+  "description": "CropView v3 — single-file PWA for geo-tagged field crop capture with a resilient, self-healing compass",
+  "main": "index.html",
+  "scripts": {
+    "serve": "npx serve ."
+  },
+  "notes": "No build step. index.html is a self-contained app; Leaflet, Turf.js and JSZip load from CDN. Deploy by serving the folder (e.g. GitHub Pages)."
+}
