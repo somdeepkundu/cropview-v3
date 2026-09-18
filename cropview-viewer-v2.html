@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="theme-color" content="#080d1a" id="meta-tc"/>
+<title>CropView v2 — Multi-ZIP Mapper &amp; Annotator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#080d1a;--surf:#0f1626;--surf2:#182035;--surf3:#1e2840;--bdr:#253047;
+  --acc:#22d3ee;--acc2:#0ea5e9;--txt:#e8f0fe;--txt2:#94a3b8;--txt3:#64748b;
+  --ok:#34d399;--warn:#fbbf24;--err:#f87171;--r:10px;--shadow:0 8px 32px rgba(0,0,0,.55);--pw:340px;
+}
+[data-theme="light"]{
+  --bg:#eef2f9;--surf:#fff;--surf2:#f1f5fd;--surf3:#e4eaf7;--bdr:#cdd6e8;
+  --acc:#0284c7;--acc2:#0369a1;--txt:#0d1626;--txt2:#475569;--txt3:#94a3b8;--shadow:0 4px 16px rgba(0,0,0,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Comfortaa',system-ui,sans-serif;background:var(--bg);color:var(--txt);
+     display:flex;flex-direction:column;transition:background .25s,color .25s;font-weight:400}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+
+/* ── Top bar ── */
+#topbar{height:54px;min-height:54px;background:var(--surf);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;gap:10px;padding:0 16px;z-index:9000;box-shadow:0 1px 10px rgba(0,0,0,.25)}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-ic{width:32px;height:32px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo-tx{line-height:1.15}
+.logo-tx b{font-size:.9rem;font-weight:800;letter-spacing:.2px}
+.logo-tx small{display:block;font-size:.6rem;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase}
+.spacer{flex:1}
+.tbtn{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:8px;padding:6px 12px;
+  font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:5px;transition:background .15s,border-color .15s;white-space:nowrap}
+.tbtn:hover{background:var(--surf3);border-color:var(--acc)}
+.tbtn.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:transparent;color:#00131a}
+#theme-btn{width:36px;height:36px;padding:0;justify-content:center;font-size:17px}
+#toggle-panel-btn{display:none}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;padding:3px}
+.tabbtn{background:transparent;border:none;color:var(--txt2);border-radius:7px;padding:6px 14px;
+  font-size:.76rem;font-weight:700;display:flex;align-items:center;gap:6px;transition:all .15s}
+.tabbtn.on{background:var(--acc);color:#00131a}
+.badge-count{background:rgba(251,191,36,.18);color:var(--warn);font-size:.62rem;font-weight:800;
+  border-radius:20px;padding:1px 6px;min-width:16px;text-align:center}
+.tabbtn.on .badge-count{background:rgba(0,0,0,.2);color:#00131a}
+
+/* ── Layout ── */
+#main{flex:1;display:flex;overflow:hidden;position:relative}
+.view{width:100%;height:100%;display:none;flex-direction:row;overflow:hidden}
+.view.on{display:flex}
+
+/* ── Sidebar / panel (shared look) ── */
+.panel{width:var(--pw);min-width:var(--pw);background:var(--surf);border-right:1px solid var(--bdr);
+  display:flex;flex-direction:column;overflow:hidden;transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:100}
+.panel-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:20px}
+.panel-scroll::-webkit-scrollbar{width:3px}
+.panel-scroll::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+
+.sec{padding:14px 16px 0}
+.sec-hd{font-size:.63rem;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--txt3);
+  display:flex;align-items:center;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--bdr);margin-bottom:12px}
+.sec-hd svg{opacity:.6;flex-shrink:0}
+
+#dropzone{border:2px dashed var(--bdr);border-radius:var(--r);padding:24px 16px;text-align:center;cursor:pointer;
+  background:var(--surf2);transition:border-color .2s,background .2s}
+#dropzone:hover,#dropzone.over{border-color:var(--acc);background:rgba(34,211,238,.06)}
+#dropzone .dz-ic{font-size:2rem;display:block;margin-bottom:6px}
+#dropzone .dz-t{font-size:.83rem;font-weight:700;margin-bottom:3px}
+#dropzone .dz-s{font-size:.7rem;color:var(--txt3)}
+.file-in{display:none}
+
+#progress-wrap{display:none;padding:12px 16px 0}
+.prog-bar-bg{background:var(--surf3);border-radius:20px;height:6px;overflow:hidden;margin-bottom:6px}
+.prog-bar{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:20px;width:0%;transition:width .25s}
+#prog-label{font-size:.71rem;color:var(--txt3);text-align:center}
+
+/* batch list */
+.batch-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:7px;
+  border-left:3px solid var(--acc);display:flex;align-items:center;gap:8px}
+.batch-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.batch-name{font-size:.78rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-meta{font-size:.63rem;color:var(--txt3)}
+.batch-x{background:none;border:none;color:var(--txt3);font-size:16px;line-height:1;padding:2px 4px;flex-shrink:0}
+.batch-x:hover{color:var(--err)}
+
+.rot-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.rp-btn{flex:1;min-width:44px;padding:6px 4px;text-align:center;background:var(--surf2);border:1px solid var(--bdr);
+  border-radius:7px;font-size:.72rem;font-weight:700;color:var(--txt2);transition:all .15s}
+.rp-btn.on,.rp-btn:hover{background:var(--acc);border-color:var(--acc);color:#00131a}
+.custom-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.custom-row input{flex:1;background:var(--surf2);border:1px solid var(--bdr);border-radius:7px;color:var(--txt);
+  padding:5px 10px;font-size:.8rem;text-align:center;outline:none}
+.custom-row label{font-size:.71rem;color:var(--txt3);flex-shrink:0}
+.dir-wrap{display:flex;border:1px solid var(--bdr);border-radius:8px;overflow:hidden}
+.dir-btn{flex:1;padding:7px 4px;font-size:.72rem;font-weight:700;background:var(--surf2);border:none;color:var(--txt2)}
+.dir-btn.on{background:var(--acc);color:#00131a}
+.dir-btn:first-child{border-right:1px solid var(--bdr)}
+
+.tog-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.tog-row .tl{font-size:.76rem;color:var(--txt2)}
+.sw{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sl{position:absolute;inset:0;background:var(--bdr);border-radius:20px;cursor:pointer;transition:.2s}
+.sl::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+.sl{background:var(--acc)}
+.sw input:checked+.sl::before{transform:translateX(16px)}
+
+.range-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.range-row .rl{font-size:.72rem;color:var(--txt2);flex-shrink:0;min-width:78px}
+.range-row input[type=range]{flex:1;accent-color:var(--acc)}
+.range-row .rv{font-size:.71rem;color:var(--acc);font-weight:700;min-width:34px;text-align:right}
+.sel-styled{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:7px;
+  padding:5px 8px;font-size:.76rem;cursor:pointer;outline:none}
+
+#stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 16px}
+.sc{background:var(--surf2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px}
+.sc .sk{font-size:.58rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px}
+.sc .sv{font-size:.94rem;font-weight:800;margin-top:2px}
+
+.ts-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+.thumb{flex-shrink:0;width:60px;height:46px;border-radius:6px;object-fit:cover;border:2px solid var(--bdr);
+  cursor:pointer;transition:border-color .15s,transform .15s}
+.thumb:hover{border-color:var(--acc);transform:scale(1.05)}
+
+.act-btn{display:flex;width:calc(100% - 32px);margin:8px 16px 0;border:none;border-radius:var(--r);padding:10px;
+  font-size:.8rem;font-weight:800;align-items:center;justify-content:center;gap:7px;transition:opacity .2s,transform .1s}
+.act-btn:active{transform:scale(.98)}
+.act-btn.gradient{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#00131a}
+.act-btn.ghost{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt)}
+
+/* ── Map wrap ── */
+.map-wrap{flex:1;position:relative;background:#060b15}
+.leaflet-container{background:#060b15}
+[data-theme="dark"] .leaflet-tile{filter:brightness(.8) saturate(.85)}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;pointer-events:none;z-index:10}
+#empty .e-ic{font-size:4rem;opacity:.2}
+#empty p{font-size:.82rem;color:var(--txt3);text-align:center;max-width:240px;opacity:.6;line-height:1.5}
+
+/* popup */
+.leaflet-popup-content-wrapper{background:var(--surf)!important;border:1px solid var(--bdr)!important;
+  border-radius:12px!important;color:var(--txt)!important;box-shadow:var(--shadow)!important;padding:0!important;overflow:hidden!important}
+.leaflet-popup-content{margin:0!important;width:auto!important}
+.leaflet-popup-tip{background:var(--surf)!important}
+.leaflet-popup-close-button{color:var(--txt2)!important;font-size:18px!important;top:6px!important;right:10px!important}
+.pop-img-wrap{width:100%;height:140px;overflow:hidden;background:var(--surf3);display:flex;align-items:center;justify-content:center}
+.pop-img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.pop-img-wrap .no-img{font-size:.72rem;color:var(--txt3)}
+.pop-body{padding:9px 11px 11px}
+.pop-id{font-size:.68rem;font-weight:800;color:var(--acc);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.pf{background:var(--surf2);border-radius:6px;padding:5px 7px}
+.pk{font-size:.56rem;color:var(--txt3);text-transform:uppercase}
+.pv{font-size:.78rem;font-weight:700;margin-top:1px}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--err);
+  color:#fff;padding:9px 18px;border-radius:8px;font-size:.8rem;font-weight:600;z-index:99999;
+  transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;max-width:90vw;text-align:center;box-shadow:var(--shadow)}
+#toast.ok{background:var(--ok);color:#00250f}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ── Collapsible sections ── */
+.sec-hd.clk{cursor:pointer;user-select:none;transition:color .15s}
+.sec-hd.clk:hover{color:var(--acc)}
+.sec-hd .chev{margin-left:auto;flex-shrink:0;transition:transform .28s cubic-bezier(.4,0,.2,1);opacity:.7}
+.sec.collapsed .sec-hd .chev{transform:rotate(-90deg)}
+.sec-body{overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1),opacity .22s,margin .28s}
+.sec.collapsed>.sec-body{max-height:0!important;opacity:0;margin-bottom:-12px}
+.sec.collapsed .sec-hd{margin-bottom:0;border-bottom-color:transparent}
+.badge-mini{font-size:.6rem;font-weight:700;color:var(--acc);background:rgba(34,211,238,.12);border-radius:20px;padding:1px 7px}
+
+/* ══════════════ ANNOTATE TAB ══════════════ */
+#tab-annotate{flex-direction:column}
+.an-toolbar{background:var(--surf);border-bottom:1px solid var(--bdr);padding:10px 16px;
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.an-toolbar .grp{display:flex;align-items:center;gap:7px}
+.an-toolbar label{font-size:.7rem;color:var(--txt3);font-weight:700}
+.an-body{flex:1;display:flex;overflow:hidden}
+.an-left{width:340px;min-width:340px;background:var(--surf);border-right:1px solid var(--bdr);
+  overflow-y:auto;padding:14px 16px}
+.an-right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#an-map{height:260px;flex-shrink:0;border-bottom:1px solid var(--bdr)}
+.an-table-wrap{flex:1;overflow:auto;padding:0}
+table.an-table{width:100%;border-collapse:collapse;font-size:.74rem}
+table.an-table thead th{position:sticky;top:0;background:var(--surf2);color:var(--txt3);font-size:.63rem;
+  text-transform:uppercase;letter-spacing:.4px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--bdr);z-index:5}
+table.an-table td{padding:6px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+table.an-table tr.an-row:hover{background:rgba(34,211,238,.05);cursor:pointer}
+table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
+.cc-in{width:44px;text-align:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--acc);font-weight:800;padding:4px;font-size:.78rem}
+.mini-btn{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt2);border-radius:6px;
+  padding:4px 9px;font-size:.68rem;font-weight:700}
+.mini-btn:hover{border-color:var(--acc);color:var(--acc)}
+.mini-btn.danger:hover{border-color:var(--err);color:var(--err)}
+.mini-btn.ok:hover{border-color:var(--ok);color:var(--ok)}
+.legend-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.legend-row input.code{width:40px;text-align:center;background:var(--surf2);border:1px solid var(--bdr);
+  border-radius:6px;color:var(--acc);font-weight:800;padding:5px}
+.legend-row input.label{flex:1;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--txt);padding:5px 8px;font-size:.72rem}
+#an-dropzone{border:2px dashed var(--bdr);border-radius:9px;padding:14px 10px;text-align:center;cursor:pointer;
+  background:var(--surf2);font-size:.72rem;color:var(--txt3);transition:border-color .2s}
+#an-dropzone:hover,#an-dropzone.over{border-color:var(--acc);color:var(--acc)}
+
+/* restore banner */
+#restore-banner{display:none;align-items:center;gap:12px;background:rgba(34,211,238,.1);
+  border-bottom:1px solid rgba(34,211,238,.3);padding:9px 16px;font-size:.76rem}
+#restore-banner b{color:var(--acc)}
+
+/* lightbox — rich: nav arrows, detail panel, mini-map */
+#viewer-img,.thumb{cursor:zoom-in}
+#lightbox{position:fixed;inset:0;z-index:99998;display:none;background:rgba(3,7,16,0);
+  backdrop-filter:blur(0px);transition:background .3s ease,backdrop-filter .3s ease;padding:0;overflow:hidden}
+#lightbox.show{background:rgba(3,7,16,.92);backdrop-filter:blur(10px)}
+#lb-container{width:100%;height:100%;display:flex;align-items:center;justify-content:center;gap:24px;padding:40px 20px;position:relative}
+#lb-img-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:280px;height:100%}
+#lb-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,.7);
+  opacity:0;transform:scale(.88);cursor:default;transition:opacity .3s ease,transform .34s cubic-bezier(.22,1,.36,1)}
+#lightbox.show #lb-img{opacity:1;transform:scale(1)}
+.lb-arrow{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;border:none;
+  background:rgba(34,211,238,.12);color:var(--acc);font-size:24px;border-radius:8px;cursor:pointer;
+  transition:all .2s;display:flex;align-items:center;justify-content:center;font-weight:bold;z-index:10}
+.lb-arrow:hover{background:rgba(34,211,238,.22);transform:translateY(-50%) scale(1.08)}
+.lb-arrow.left{left:16px}.lb-arrow.right{right:16px}
+.lb-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
+#lb-details{width:300px;background:rgba(15,22,38,.8);border:1px solid rgba(34,211,238,.15);border-radius:10px;
+  padding:16px;overflow-y:auto;max-height:calc(100vh - 80px);opacity:0;transform:translateX(20px);
+  transition:opacity .3s ease .1s,transform .3s ease .1s;backdrop-filter:blur(8px);flex-shrink:0}
+#lightbox.show #lb-details{opacity:1;transform:translateX(0)}
+#lb-details::-webkit-scrollbar{width:4px}
+#lb-details::-webkit-scrollbar-thumb{background:rgba(34,211,238,.3);border-radius:2px}
+.lb-row{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(34,211,238,.1)}
+.lb-row:last-child{border-bottom:none;margin-bottom:0}
+.lb-lbl{font-size:.6rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-weight:700}
+.lb-val{font-size:.84rem;font-weight:800;color:var(--acc);word-break:break-word;line-height:1.3}
+#lb-mini{width:100%;height:130px;border-radius:8px;margin-bottom:14px;overflow:hidden;border:1px solid rgba(34,211,238,.2)}
+#lb-keys{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--txt3);
+  background:rgba(0,0,0,.6);padding:6px 13px;border-radius:6px;backdrop-filter:blur(4px);opacity:0;
+  transition:opacity .3s ease .15s;text-align:center;border:1px solid rgba(34,211,238,.1)}
+#lightbox.show #lb-keys{opacity:1}
+#lb-keys b{color:var(--acc);font-weight:800;margin:0 3px}
+#lb-close{position:absolute;top:16px;right:20px;width:36px;height:36px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:#e2e8f0;font-size:20px;line-height:1;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;z-index:11}
+#lb-close:hover{background:rgba(0,0,0,.85);border-color:var(--acc)}
+@media(max-width:1000px){#lb-details{width:260px}#lb-container{gap:16px;padding:30px 16px}}
+@media(max-width:900px){#lb-details{display:none}.lb-arrow{width:44px;height:44px;font-size:20px}}
+@media(max-width:600px){.lb-arrow{width:38px;height:38px;font-size:17px}#lb-container{padding:20px 6px}#lb-keys{font-size:.56rem;padding:5px 10px}}
+
+@media(max-width:900px){
+  :root{--pw:100vw}
+  .an-left{width:260px;min-width:260px}
+}
+@media(max-width:720px){
+  .view{flex-direction:column}
+  .panel{width:100%;min-width:100%;border-right:none;border-top:1px solid var(--bdr);
+    position:absolute;bottom:0;left:0;top:auto;z-index:500;max-height:65vh;border-radius:16px 16px 0 0;transform:translateY(100%)}
+  .panel.open{transform:translateY(0)}
+  .panel::before{content:'';display:block;width:36px;height:4px;background:var(--bdr);border-radius:4px;margin:10px auto 0}
+  #toggle-panel-btn{display:flex!important}
+  .an-body{flex-direction:column}
+  .an-left{width:100%;min-width:100%;max-height:40vh}
+  .logo-tx small{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP BAR ═══ -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-ic">🌾</div>
+    <div class="logo-tx"><b>CropView v2</b><small>Multi-ZIP Mapper &amp; Annotator</small></div>
+  </div>
+  <div class="tabs">
+    <button class="tabbtn on" data-tab="map" onclick="switchTab('map')">🗺️ Map</button>
+    <button class="tabbtn" data-tab="annotate" onclick="switchTab('annotate')">🏷️ Annotate <span class="badge-count" id="annot-badge" style="display:none">0</span></button>
+  </div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="reset-btn" style="display:none" onclick="resetApp()">
+    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Reset
+  </button>
+  <button class="tbtn" id="toggle-panel-btn" onclick="togglePanel()">
+    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Controls
+  </button>
+  <button class="tbtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+</div>
+
+<!-- restore-session banner -->
+<div id="restore-banner">
+  <span>💾 Found a saved annotation session — <span id="restore-info"></span></span>
+  <span class="spacer"></span>
+  <button class="mini-btn ok" onclick="doRestore()">Restore</button>
+  <button class="mini-btn" onclick="dismissRestore()">Dismiss</button>
+</div>
+
+<div id="main">
+
+  <!-- ══════════════════════ MAP TAB ══════════════════════ -->
+  <div class="view on" id="tab-map">
+    <div class="panel" id="map-panel">
+      <div class="panel-scroll">
+
+        <div class="sec" id="sec-upload">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload CropView ZIP(s)
+          </div>
+          <div id="dropzone"
+            onclick="document.getElementById('file-in').click()"
+            ondragover="event.preventDefault();this.classList.add('over')"
+            ondragleave="this.classList.remove('over')"
+            ondrop="handleDrop(event)">
+            <span class="dz-ic">📦</span>
+            <div class="dz-t">Drop .zip export(s) here</div>
+            <div class="dz-s">Any number of ZIPs — each one stacks as its own colour-coded set</div>
+          </div>
+          <input type="file" id="file-in" class="file-in" accept=".zip" multiple onchange="handleFiles(this.files)"/>
+        </div>
+
+        <div id="progress-wrap">
+          <div class="prog-bar-bg"><div class="prog-bar" id="prog-bar"></div></div>
+          <div id="prog-label">Unpacking…</div>
+        </div>
+
+        <div class="sec" id="sec-sets" style="margin-top:6px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Loaded Sets
+          </div>
+          <div id="batch-list" style="font-size:.72rem;color:var(--txt3)">No sets loaded yet.</div>
+        </div>
+
+        <div class="sec" style="margin-top:6px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+            Rotation Offset
+          </div>
+          <div class="rot-presets">
+            <button class="rp-btn on" data-v="0" onclick="setPreset(this)">0°</button>
+            <button class="rp-btn" data-v="45" onclick="setPreset(this)">45°</button>
+            <button class="rp-btn" data-v="90" onclick="setPreset(this)">90°</button>
+            <button class="rp-btn" data-v="135" onclick="setPreset(this)">135°</button>
+            <button class="rp-btn" data-v="180" onclick="setPreset(this)">180°</button>
+          </div>
+          <div class="custom-row">
+            <input type="number" id="cust-in" min="0" max="360" placeholder="Custom °" oninput="setCustom(+this.value)"/>
+            <label>degrees</label>
+          </div>
+          <div class="dir-wrap">
+            <button class="dir-btn on" id="dir-ccw" onclick="setDir('ccw')">Anti-clockwise</button>
+            <button class="dir-btn" id="dir-cw" onclick="setDir('cw')">Clockwise</button>
+          </div>
+        </div>
+
+        <div class="sec" style="margin-top:14px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            Map Layers
+          </div>
+          <div class="tog-row"><span class="tl">Ground footprint polygon</span>
+            <label class="sw"><input type="checkbox" id="tog-fp" onchange="redraw()"/><span class="sl"></span></label></div>
+          <div class="tog-row"><span class="tl">Azimuth arrow</span>
+            <label class="sw"><input type="checkbox" id="tog-arr" onchange="redraw()"/><span class="sl"></span></label></div>
+          <div class="tog-row"><span class="tl">Computed FOV cone</span>
+            <label class="sw"><input type="checkbox" id="tog-cone" onchange="redraw()"/><span class="sl"></span></label></div>
+          <div class="tog-row"><span class="tl">Capture path</span>
+            <label class="sw"><input type="checkbox" id="tog-path" checked onchange="redraw()"/><span class="sl"></span></label></div>
+          <div class="range-row">
+            <span class="rl">Arrow length</span>
+            <input type="range" id="sl-len" min="30" max="800" value="150"
+              oninput="arrowLen=+this.value;document.getElementById('sl-len-v').textContent=this.value+'m';redraw()"/>
+            <span class="rv" id="sl-len-v">150m</span>
+          </div>
+          <div style="margin-bottom:4px">
+            <div style="font-size:.73rem;color:var(--txt2);margin-bottom:5px">Colour by</div>
+            <select class="sel-styled" id="sel-col" onchange="redraw()">
+              <option value="batch" selected>Project / Set</option>
+              <option value="azimuth">Azimuth</option>
+              <option value="tilt">Tilt</option>
+              <option value="altitude">Altitude</option>
+              <option value="index">Index</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sec" id="viewer-sec" style="display:none;margin-top:14px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Viewing
+          </div>
+          <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;margin-bottom:10px">
+            <div style="width:100%;height:180px;background:var(--surf3);display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <img id="viewer-img" style="width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in" onclick="if(selectedCapture) openLightboxFor(selectedCapture, activeCaps().filter(c=>c.imgUrl), 'map')"/>
+            </div>
+            <div style="padding:10px 12px">
+              <div style="font-size:.7rem;font-weight:800;color:var(--acc);margin-bottom:6px;word-break:break-all" id="viewer-id">—</div>
+              <div id="viewer-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px"></div>
+              <div style="background:var(--surf3);border-radius:6px;padding:6px 8px;font-size:.66rem;color:var(--txt3);line-height:1.5">
+                <b style="color:var(--txt2)">Footprint:</b> <span id="viewer-fp">—</span><br/>
+                <b style="color:var(--txt2)">Class:</b> <span id="viewer-class">unassigned</span>
+              </div>
+            </div>
+          </div>
+          <button onclick="closeViewer()" style="width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt2);padding:7px;border-radius:8px;font-size:.75rem;font-weight:600">Close Viewer</button>
+        </div>
+
+        <div class="sec" style="margin-top:14px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Summary
+          </div>
+          <div id="stats-grid">
+            <div class="sc"><div class="sk">Captures</div><div class="sv" id="st-n">—</div></div>
+            <div class="sc"><div class="sk">Images</div><div class="sv" id="st-img">—</div></div>
+            <div class="sc"><div class="sk">Sets loaded</div><div class="sv" id="st-sets">—</div></div>
+            <div class="sc"><div class="sk">Annotated</div><div class="sv" id="st-annot">—</div></div>
+          </div>
+        </div>
+
+        <div class="sec" style="margin-top:14px">
+          <div class="sec-hd">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Images
+          </div>
+          <div id="thumb-strip" style="display:none"><div class="ts-scroll" id="thumb-row"></div></div>
+          <div id="no-imgs" style="font-size:.71rem;color:var(--txt3)">No images loaded yet.</div>
+        </div>
+
+        <button class="act-btn gradient" id="export-json-btn" style="display:none" onclick="downloadPointsJSON()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Combined Points GeoJSON
+        </button>
+        <div id="dl-note" style="display:none;margin:6px 16px 16px;font-size:.66rem;color:var(--txt3);text-align:center;line-height:1.4">
+          Points only — no images. Valid GeoJSON, so it opens directly in QGIS / GeoLibre / any GIS tool. Also includes every set and any class codes already assigned — reopen this same file on the Annotate tab anytime.
+        </div>
+
+      </div>
+    </div>
+    <div class="map-wrap">
+      <div id="empty"><div class="e-ic">🗺️</div><p>Upload one or more CropView ZIP exports to visualise captures on the map</p></div>
+      <div id="map" style="width:100%;height:100%"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ ANNOTATE TAB ══════════════════════ -->
+  <div class="view" id="tab-annotate">
+    <div class="an-toolbar">
+      <div class="grp"><label>Project</label>
+        <select class="sel-styled" id="an-filter-project" style="width:150px" onchange="annotFilterProject=this.value;refreshAnnotateList()"><option value="__all__">All projects</option></select>
+      </div>
+      <div class="grp"><label>Hide deleted</label>
+        <label class="sw"><input type="checkbox" id="an-hide-del" checked onchange="annotHideDeleted=this.checked;refreshAnnotateList()"/><span class="sl"></span></label>
+      </div>
+      <div class="grp"><label>Unassigned only</label>
+        <label class="sw"><input type="checkbox" id="an-unassigned" onchange="annotOnlyUnassigned=this.checked;refreshAnnotateList()"/><span class="sl"></span></label>
+      </div>
+      <span class="spacer"></span>
+      <span style="font-size:.72rem;color:var(--txt3)" id="an-count">0 / 0 points</span>
+      <span style="font-size:.72rem;color:var(--acc)" id="an-sel-count-wrap">Selected: <b id="an-sel-count">0</b></span>
+      <button class="mini-btn" onclick="selectAllFiltered()">Select filtered</button>
+      <button class="mini-btn" onclick="clearSelection()">Clear</button>
+      <input id="an-bulk-code" type="text" maxlength="2" placeholder="code" style="width:48px;text-align:center;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;color:var(--acc);font-weight:800;padding:5px"/>
+      <button class="mini-btn ok" onclick="applyBulkCode()">Apply to selected</button>
+      <button class="mini-btn danger" onclick="bulkDelete()">Delete selected</button>
+      <button class="mini-btn" onclick="bulkRestore()">Restore selected</button>
+      <button class="tbtn primary" onclick="downloadPointsJSON()">⬇ Export Annotated GeoJSON</button>
+    </div>
+
+    <div class="an-body">
+      <div class="an-left">
+
+        <div class="sec-hd" style="margin-bottom:10px">Import Points JSON</div>
+        <div id="an-dropzone"
+          onclick="document.getElementById('an-file-in').click()"
+          ondragover="event.preventDefault();this.classList.add('over')"
+          ondragleave="this.classList.remove('over')"
+          ondrop="handleAnnotDrop(event)">
+          📥 Drop / click to load a combined points GeoJSON<br/>(matches existing points by ID, restores class codes &amp; deletions)
+        </div>
+        <input type="file" id="an-file-in" class="file-in" accept=".json,.geojson" onchange="if(this.files[0])handlePointsJSONFile(this.files[0])"/>
+
+        <div id="an-focus" style="display:none;margin-top:16px;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px"></div>
+
+        <div class="sec-hd" style="margin:18px 0 10px">Class Legend</div>
+        <div style="font-size:.65rem;color:var(--txt3);margin-bottom:8px;line-height:1.5">
+          2-digit code: 1st digit = crop/land type, 2nd digit = growth stage (or sub-category for non-ag codes).
+        </div>
+        <div id="legend-list"></div>
+        <button class="mini-btn" style="width:100%;margin-top:4px" onclick="addLegendRow()">+ Add code</button>
+
+      </div>
+      <div class="an-right">
+        <div id="an-map"></div>
+        <div class="an-table-wrap">
+          <table class="an-table">
+            <thead><tr>
+              <th style="width:26px"></th><th style="width:44px">Img</th><th>ID</th><th>Project</th><th style="width:60px">Class</th><th>Label</th><th style="width:70px"></th>
+            </tr></thead>
+            <tbody id="an-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div id="toast"></div>
+
+<div id="lightbox" onclick="if(event.target.id==='lightbox') closeLightbox()">
+  <div id="lb-container">
+    <button class="lb-arrow left" onclick="navLightbox(-1)" title="Previous (←)">‹</button>
+    <div id="lb-img-wrap"><img id="lb-img" alt="" onclick="event.stopPropagation()"/></div>
+    <div id="lb-details">
+      <div id="lb-mini"></div>
+      <div id="lb-details-content"></div>
+    </div>
+    <button class="lb-arrow right" onclick="navLightbox(1)" title="Next (→)">›</button>
+    <button id="lb-close" onclick="closeLightbox()" title="Close (Esc)">×</button>
+    <div id="lb-keys"><b>←→</b>Navigate &nbsp;|&nbsp; <b>Space</b>Next &nbsp;|&nbsp; <b>Esc</b>Close &nbsp;|&nbsp; <b>I</b>Info</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let captures = [];          // flattened points from all sets + imports
+let batches  = [];          // {id,name,fileName,count,imgCount}
+let nextBatchId = 1;
+let projectColorMap = {};
+const PALETTE = ['#22d3ee','#f59e0b','#a78bfa','#34d399','#f87171','#818cf8','#fb923c','#4ade80','#e879f9','#38bdf8','#facc15','#fb7185','#2dd4bf','#c084fc'];
+
+const CARTO_URL  = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_3oql_1_644968c9b34d6aa6ff5f421f';
+const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>';
+
+let rotOffset = 0, rotDir = 'ccw', arrowLen = 150;
+let isDark = true, mapReady = false;
+let theMap,gFP,gArrow,gCone,gPath,gPts;
+let imgBlobs = {}, imgB64s = {};
+let selectedCapture = null;
+let activeTab = 'map';
+
+let annotMap, annotLayer;
+let annotSelection = new Set();
+let annotFilterProject = '__all__';
+let annotHideDeleted = true;
+let annotOnlyUnassigned = false;
+let annotFocused = null;
+
+let lbList = [], lbIndex = -1, lbContext = 'map';
+let lbMiniMap = null, lbMiniLayer = null;
+let lbDetailsVisible = true;
+
+let classLegend = JSON.parse(localStorage.getItem('cv_legend')||'null') || [
+  {code:'11', label:'Sugarcane — Stage 1'},
+  {code:'12', label:'Sugarcane — Stage 2'},
+  {code:'13', label:'Sugarcane — Stage 3'},
+  {code:'14', label:'Sugarcane — Stage 4'},
+  {code:'21', label:'Banana — Stage 1'},
+  {code:'22', label:'Banana — Stage 2'},
+  {code:'23', label:'Banana — Stage 3'},
+  {code:'24', label:'Banana — Stage 4'},
+  {code:'30', label:'Non-agriculture — type A'},
+  {code:'40', label:'Non-agriculture — type B'},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// UTIL
+// ═══════════════════════════════════════════════════════════════
+function toggleTheme(){
+  isDark = !isDark;
+  document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+  document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+  document.getElementById('meta-tc').content = isDark ? '#080d1a' : '#eef2f9';
+}
+function togglePanel(){
+  const p = activeTab==='map' ? document.getElementById('map-panel') : null;
+  if(p) p.classList.toggle('open');
+}
+function showToast(msg,type='err',ms=3600){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=(type==='ok'?'ok':'')+' show';
+  clearTimeout(t._tid); t._tid=setTimeout(()=>t.classList.remove('show'),ms);
+}
+function colorFor(name){
+  const key = name || 'Unassigned';
+  if(!projectColorMap[key]) projectColorMap[key] = PALETTE[Object.keys(projectColorMap).length % PALETTE.length];
+  return projectColorMap[key];
+}
+function activeCaps(){ return captures.filter(c=>!c.deleted); }
+
+// ── collapsibles (map panel) ──
+function initCollapsibles(){
+  document.querySelectorAll('#map-panel .sec').forEach(sec=>{
+    const hd=sec.querySelector(':scope > .sec-hd');
+    if(!hd||sec.querySelector(':scope > .sec-body')) return;
+    const body=document.createElement('div'); body.className='sec-body';
+    while(hd.nextSibling) body.appendChild(hd.nextSibling);
+    sec.appendChild(body);
+    hd.classList.add('clk');
+    hd.insertAdjacentHTML('beforeend',`<svg class="chev" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>`);
+    hd.addEventListener('click',()=>toggleSection(sec));
+    body.style.maxHeight='none';
+  });
+}
+function toggleSection(sec,force){
+  const collapse = force===undefined ? !sec.classList.contains('collapsed') : force;
+  const body = sec.querySelector(':scope > .sec-body'); if(!body) return;
+  if(collapse){
+    body.style.maxHeight=body.scrollHeight+'px';
+    requestAnimationFrame(()=>{ sec.classList.add('collapsed'); body.style.maxHeight='0px'; });
+  } else {
+    sec.classList.remove('collapsed');
+    body.style.maxHeight=body.scrollHeight+'px';
+    setTimeout(()=>{ if(!sec.classList.contains('collapsed')) body.style.maxHeight='none'; },340);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+function switchTab(tab){
+  activeTab=tab;
+  document.getElementById('tab-map').classList.toggle('on', tab==='map');
+  document.getElementById('tab-annotate').classList.toggle('on', tab==='annotate');
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  if(tab==='annotate'){
+    initAnnotMap();
+    refreshAnnotateList();
+    setTimeout(()=>annotMap&&annotMap.invalidateSize(),60);
+  } else {
+    setTimeout(()=>theMap&&theMap.invalidateSize(),60);
+  }
+}
+function updateAnnotBadge(){
+  const n = activeCaps().filter(c=>!c.class_code).length;
+  const b = document.getElementById('annot-badge');
+  if(n>0){ b.style.display='inline-block'; b.textContent=n; } else b.style.display='none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════════════════════════
+function resetApp(){
+  Object.values(imgBlobs).forEach(u=>{ try{URL.revokeObjectURL(u)}catch(e){} });
+  captures=[]; batches=[]; imgBlobs={}; imgB64s={}; projectColorMap={};
+  rotOffset=0; rotDir='ccw'; arrowLen=150; selectedCapture=null; annotSelection.clear();
+  localStorage.removeItem('cv_session');
+  document.getElementById('file-in').value='';
+  document.getElementById('reset-btn').style.display='none';
+  document.getElementById('export-json-btn').style.display='none';
+  document.getElementById('dl-note').style.display='none';
+  document.getElementById('viewer-sec').style.display='none';
+  document.getElementById('empty').style.display='flex';
+  document.getElementById('thumb-strip').style.display='none';
+  document.getElementById('no-imgs').style.display='block';
+  document.getElementById('progress-wrap').style.display='none';
+  document.getElementById('batch-list').innerHTML='No sets loaded yet.';
+  document.querySelectorAll('.rp-btn').forEach(b=>b.classList.toggle('on',b.dataset.v==='0'));
+  document.getElementById('dir-ccw').classList.add('on');
+  document.getElementById('dir-cw').classList.remove('on');
+  document.getElementById('cust-in').value='';
+  document.getElementById('sl-len').value=150;
+  document.getElementById('sl-len-v').textContent='150m';
+  const up=document.getElementById('sec-upload');
+  toggleSection(up,false);
+  const bdg=up.querySelector('.badge-mini'); if(bdg) bdg.remove();
+  closeLightbox();
+  updateStats(); updateAnnotBadge();
+  if(gFP){ gFP.clearLayers(); gArrow.clearLayers(); gCone.clearLayers(); gPath.clearLayers(); gPts.clearLayers(); }
+  refreshAnnotateList();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UPLOAD / PARSE (multi-zip)
+// ═══════════════════════════════════════════════════════════════
+function handleDrop(ev){
+  ev.preventDefault(); ev.currentTarget.classList.remove('over');
+  const files = Array.from(ev.dataTransfer.files).filter(f=>f.name.toLowerCase().endsWith('.zip'));
+  if(files.length) handleFiles(files); else showToast('Please drop .zip file(s)');
+}
+async function handleFiles(fileList){
+  const files = Array.from(fileList).filter(f=>f.name.toLowerCase().endsWith('.zip'));
+  if(!files.length){ showToast('Please upload .zip file(s)'); return; }
+  document.getElementById('progress-wrap').style.display='block';
+  for(let i=0;i<files.length;i++){
+    setProgress(5,`Opening ZIP ${i+1}/${files.length}: ${files[i].name}`);
+    try{
+      const buf = await files[i].arrayBuffer();
+      const zip = await JSZip.loadAsync(buf);
+      await parseZip(zip, files[i].name, i, files.length);
+    }catch(e){ showToast('Error reading '+files[i].name+': '+e.message); }
+  }
+  document.getElementById('progress-wrap').style.display='none';
+  document.getElementById('file-in').value='';
+  updateUI(); initMap(); redraw(); refreshAnnotateList(); autosave();
+  const up=document.getElementById('sec-upload');
+  toggleSection(up,true);
+  const hd=up.querySelector('.sec-hd');
+  if(!hd.querySelector('.badge-mini')){
+    const b=document.createElement('span'); b.className='badge-mini';
+    hd.insertBefore(b, hd.querySelector('.chev')); up._badge=b;
+  }
+  (up._badge||hd.querySelector('.badge-mini')).textContent = batches.length+' set'+(batches.length===1?'':'s');
+  if(window.innerWidth<=720) document.getElementById('map-panel').classList.remove('open');
+}
+function setProgress(pct,label){
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('prog-label').textContent=label;
+}
+
+async function parseZip(zip, srcFileName, idx, total){
+  const geoKey = Object.keys(zip.files).find(k=>k.endsWith('_captures_points.geojson')||k.includes('captures_points'));
+  if(!geoKey){ showToast('No captures_points.geojson found in '+srcFileName); return; }
+  setProgress(15+idx*5,'Parsing '+srcFileName+'…');
+  const geoText = await zip.files[geoKey].async('string');
+  const geo = JSON.parse(geoText);
+  const pname = (geo.metadata && geo.metadata.project) || geoKey.split('/').pop().replace('_captures_points.geojson','');
+  const batchId = 'b'+(nextBatchId++);
+
+  const newCaps = geo.features.map(f=>{
+    const p=f.properties, co=f.geometry.coordinates;
+    const fov = (f.fov_polygon && f.fov_polygon.coordinates && f.fov_polygon.coordinates[0])
+      ? f.fov_polygon.coordinates[0].map(c=>[c[1],c[0]]) : null;
+    return {
+      uid: batchId+'::'+p.id, id:p.id, batchId, project:pname, sourceZip:srcFileName,
+      lat:co[1], lon:co[0], alt:co[2]||0,
+      azimuth:p.azimuth_deg||p.heading_deg||0, tilt:p.tilt_deg||0, hfov:p.hfov_deg||65,
+      accuracy:p.gps_accuracy_m||0, fpW:p.footprint_width_m||0, fpD:p.footprint_depth_m||0,
+      fovPolyOrig:fov, imgName:p.imgName||'', imgUrl:null, imgB64:null,
+      ts:p.timestamp||'', class_code:'', deleted:false
+    };
+  });
+
+  const imgFiles = Object.keys(zip.files).filter(k=>/\.(jpg|jpeg|png|webp)$/i.test(k));
+  let loaded=0;
+  for(const k of imgFiles){
+    const fname=k.split('/').pop(), key=batchId+'::'+fname;
+    const buf=await zip.files[k].async('arraybuffer');
+    const b64=await zip.files[k].async('base64');
+    const ext=fname.split('.').pop().toLowerCase();
+    const mime= ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg';
+    imgB64s[key]='data:'+mime+';base64,'+b64;
+    imgBlobs[key]=URL.createObjectURL(new Blob([buf],{type:mime}));
+    loaded++;
+    setProgress(35+idx*5+Math.round(loaded/Math.max(imgFiles.length,1)*8),`${srcFileName}: image ${loaded}/${imgFiles.length}`);
+  }
+  newCaps.forEach(c=>{
+    const key=c.batchId+'::'+c.imgName;
+    if(c.imgName && imgBlobs[key]){ c.imgUrl=imgBlobs[key]; c.imgB64=imgB64s[key]; }
+  });
+
+  batches.push({id:batchId,name:pname,fileName:srcFileName,count:newCaps.length,imgCount:imgFiles.length});
+  captures = captures.concat(newCaps);
+  colorFor(pname);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAP-TAB UI
+// ═══════════════════════════════════════════════════════════════
+function updateUI(){
+  const has = captures.length>0;
+  document.getElementById('empty').style.display = has ? 'none' : 'flex';
+  document.getElementById('reset-btn').style.display = has ? 'flex' : 'none';
+  document.getElementById('export-json-btn').style.display = has ? 'flex' : 'none';
+  document.getElementById('dl-note').style.display = has ? 'block' : 'none';
+  renderBatchList();
+  updateStats();
+  buildThumbs();
+  updateAnnotBadge();
+}
+function renderBatchList(){
+  const wrap = document.getElementById('batch-list');
+  if(!batches.length){ wrap.innerHTML='No sets loaded yet.'; return; }
+  wrap.innerHTML = batches.map(b=>`
+    <div class="batch-card" style="border-left-color:${colorFor(b.name)}">
+      <div class="batch-dot" style="background:${colorFor(b.name)}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="batch-name">${b.name}</div>
+        <div class="batch-meta">${b.count} captures · ${b.imgCount} images</div>
+      </div>
+      <button class="batch-x" onclick="removeBatch('${b.id}')" title="Remove this set">×</button>
+    </div>`).join('');
+}
+function removeBatch(id){
+  const b = batches.find(x=>x.id===id); if(!b) return;
+  Object.keys(imgBlobs).forEach(k=>{ if(k.startsWith(id+'::')){ try{URL.revokeObjectURL(imgBlobs[k])}catch(e){}; delete imgBlobs[k]; delete imgB64s[k]; } });
+  batches = batches.filter(x=>x.id!==id);
+  captures = captures.filter(c=>c.batchId!==id);
+  annotSelection.forEach(uid=>{ if(uid.startsWith(id+'::')) annotSelection.delete(uid); });
+  if(selectedCapture && selectedCapture.batchId===id){ selectedCapture=null; document.getElementById('viewer-sec').style.display='none'; }
+  updateUI(); redraw(); refreshAnnotateList(); autosave();
+  if(!captures.length) document.getElementById('empty').style.display='flex';
+}
+function updateStats(){
+  const ac = activeCaps();
+  document.getElementById('st-n').textContent = ac.length || '—';
+  document.getElementById('st-img').textContent = ac.filter(c=>c.imgUrl).length || '—';
+  document.getElementById('st-sets').textContent = batches.length || '—';
+  document.getElementById('st-annot').textContent = ac.length ? ac.filter(c=>c.class_code).length+' / '+ac.length : '—';
+}
+function buildThumbs(){
+  const row=document.getElementById('thumb-row'); row.innerHTML='';
+  const imgs = activeCaps().filter(c=>c.imgUrl);
+  if(!imgs.length){ document.getElementById('no-imgs').style.display='block'; document.getElementById('thumb-strip').style.display='none'; return; }
+  document.getElementById('no-imgs').style.display='none';
+  document.getElementById('thumb-strip').style.display='block';
+  imgs.forEach(c=>{
+    const wrap=document.createElement('div');
+    wrap.style.cssText='position:relative;flex-shrink:0';
+    const img=document.createElement('img');
+    img.className='thumb'; img.src=c.imgUrl; img.title=c.id;
+    img.style.borderColor=colorFor(c.project);
+    img.onclick=()=>{ if(theMap){ theMap.setView([c.lat,c.lon],17); } openViewer(c); document.getElementById('map-panel').classList.remove('open'); };
+    wrap.appendChild(img);
+    const exp=document.createElement('button');
+    exp.innerHTML='⤢'; exp.title='Enlarge';
+    exp.style.cssText='position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:4px;background:rgba(34,211,238,.9);color:#00131a;border:none;font-size:10px;font-weight:900;cursor:pointer;opacity:0;transition:opacity .15s;display:flex;align-items:center;justify-content:center';
+    exp.onclick=(e)=>{ e.stopPropagation(); openLightboxFor(c, imgs, 'map'); };
+    wrap.appendChild(exp);
+    wrap.onmouseenter=()=>exp.style.opacity='1';
+    wrap.onmouseleave=()=>exp.style.opacity='0';
+    row.appendChild(wrap);
+  });
+}
+function openViewer(c){
+  selectedCapture=c;
+  document.getElementById('viewer-sec').style.display='block';
+  document.getElementById('viewer-id').textContent=c.id;
+  document.getElementById('viewer-img').src=c.imgUrl||c.imgB64||'';
+  const leg=classLegend.find(l=>l.code===c.class_code);
+  document.getElementById('viewer-grid').innerHTML=`
+    <div class="pf"><div class="pk">Latitude</div><div class="pv" style="font-size:.72rem">${c.lat.toFixed(6)}</div></div>
+    <div class="pf"><div class="pk">Longitude</div><div class="pv" style="font-size:.72rem">${c.lon.toFixed(6)}</div></div>
+    <div class="pf"><div class="pk">Azimuth</div><div class="pv" style="color:#f59e0b">${c.azimuth}°</div></div>
+    <div class="pf"><div class="pk">Tilt</div><div class="pv" style="color:#34d399">${c.tilt}°</div></div>
+    <div class="pf"><div class="pk">Project</div><div class="pv" style="font-size:.68rem">${c.project}</div></div>
+    <div class="pf"><div class="pk">Alt</div><div class="pv" style="color:#38bdf8">${(+c.alt).toFixed(1)}m</div></div>`;
+  document.getElementById('viewer-fp').textContent = `${c.fpW.toFixed(0)}m × ${c.fpD.toFixed(0)}m`;
+  document.getElementById('viewer-class').textContent = c.class_code ? (c.class_code+(leg?' — '+leg.label:' (unknown code)')) : 'unassigned';
+  redraw();
+}
+function closeViewer(){ document.getElementById('viewer-sec').style.display='none'; selectedCapture=null; redraw(); }
+
+// ═══════════════════════════════════════════════════════════════
+// MAP RENDER
+// ═══════════════════════════════════════════════════════════════
+function initMap(){
+  if(!mapReady){
+    const ac=activeCaps();
+    const clat = ac.reduce((s,c)=>s+c.lat,0)/(ac.length||1) || 20;
+    const clon = ac.reduce((s,c)=>s+c.lon,0)/(ac.length||1) || 78;
+    theMap = L.map('map').setView([clat,clon], ac.length?16:5);
+    const voyager = L.tileLayer(CARTO_URL,{attribution:CARTO_ATTR,maxZoom:20});
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri, Maxar, Earthstar Geographics',maxZoom:18});
+    voyager.addTo(theMap);
+    L.control.layers({'🗺️ Voyager':voyager,'🛰️ Satellite':esriSat},null,{position:'topleft',collapsed:true}).addTo(theMap);
+    gFP=L.layerGroup().addTo(theMap); gCone=L.layerGroup().addTo(theMap);
+    gArrow=L.layerGroup().addTo(theMap); gPath=L.layerGroup().addTo(theMap); gPts=L.layerGroup().addTo(theMap);
+    mapReady=true;
+  } else if(captures.length){
+    const ac=activeCaps();
+    const clat = ac.reduce((s,c)=>s+c.lat,0)/(ac.length||1);
+    const clon = ac.reduce((s,c)=>s+c.lon,0)/(ac.length||1);
+    theMap.setView([clat,clon],16);
+  }
+}
+function destPt(lat,lon,bearDeg,distM){
+  const R=6371000,δ=distM/R,θ=bearDeg*Math.PI/180,φ1=lat*Math.PI/180,λ1=lon*Math.PI/180;
+  const φ2=Math.asin(Math.sin(φ1)*Math.cos(δ)+Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2=λ1+Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1),Math.cos(δ)-Math.sin(φ1)*Math.sin(φ2));
+  return [φ2*180/Math.PI, λ2*180/Math.PI];
+}
+function rotatePoly(pts,cLat,cLon,angleDeg){
+  if(angleDeg===0) return pts;
+  const rad=angleDeg*Math.PI/180, cosA=Math.cos(rad), sinA=Math.sin(rad);
+  const mLa=111320, mLo=111320*Math.cos(cLat*Math.PI/180);
+  return pts.map(([la,lo])=>{
+    const dy=(la-cLat)*mLa, dx=(lo-cLon)*mLo;
+    const rx=dx*cosA+dy*sinA, ry=dy*cosA-dx*sinA;
+    return [cLat+ry/mLa, cLon+rx/mLo];
+  });
+}
+function effectiveAz(az){ const off=rotDir==='ccw'?-rotOffset:rotOffset; return ((az+off)%360+360)%360; }
+function getColor(c){
+  const mode=document.getElementById('sel-col').value;
+  if(mode==='batch') return colorFor(c.project);
+  const list=activeCaps();
+  const vals=list.map(x=>mode==='azimuth'?x.azimuth:mode==='tilt'?x.tilt:mode==='altitude'?x.alt:list.indexOf(x));
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const v=mode==='azimuth'?c.azimuth:mode==='tilt'?c.tilt:mode==='altitude'?c.alt:list.indexOf(c);
+  const t=mx===mn?.5:(v-mn)/(mx-mn);
+  return `hsl(${240-240*t},80%,55%)`;
+}
+function redraw(){
+  if(!mapReady) return;
+  const showFP=document.getElementById('tog-fp').checked;
+  const showArr=document.getElementById('tog-arr').checked;
+  const showCone=document.getElementById('tog-cone').checked;
+  const showPath=document.getElementById('tog-path').checked;
+  gFP.clearLayers(); gArrow.clearLayers(); gCone.clearLayers(); gPath.clearLayers(); gPts.clearLayers();
+  const list = activeCaps();
+  if(showPath && list.length>1) L.polyline(list.map(c=>[c.lat,c.lon]),{color:'#334155',weight:2,dashArray:'7 5',opacity:.65}).addTo(gPath);
+
+  list.forEach((c,i)=>{
+    const col=getColor(c), eaz=effectiveAz(c.azimuth), rotAngle=rotDir==='ccw'?-rotOffset:rotOffset;
+    if(showFP && c.fovPolyOrig){
+      L.polygon(rotatePoly(c.fovPolyOrig,c.lat,c.lon,rotAngle),{color:col,fillColor:col,fillOpacity:.12,weight:1.5,opacity:.6}).addTo(gFP);
+    }
+    if(showCone){
+      const half=c.hfov/2, pts=[[c.lat,c.lon]];
+      for(let s=0;s<=24;s++) pts.push(destPt(c.lat,c.lon,eaz-half+(c.hfov*s/24),arrowLen*1.5));
+      pts.push([c.lat,c.lon]);
+      L.polygon(pts,{color:col,fillColor:col,fillOpacity:.13,weight:1,opacity:.5,dashArray:'4 3'}).addTo(gCone);
+    }
+    if(showArr){
+      const tip=destPt(c.lat,c.lon,eaz,arrowLen);
+      L.polyline([[c.lat,c.lon],tip],{color:col,weight:2.5,opacity:.9}).addTo(gArrow);
+      const lh=destPt(tip[0],tip[1],eaz+150,arrowLen*.2), rh=destPt(tip[0],tip[1],eaz-150,arrowLen*.2);
+      L.polygon([tip,lh,rh],{color:col,fillColor:col,fillOpacity:1,weight:0}).addTo(gArrow);
+    }
+    const isSel = selectedCapture && selectedCapture.uid===c.uid;
+    const mk=L.circleMarker([c.lat,c.lon],{radius:isSel?13:8,color:'#fff',weight:isSel?3:2,fillColor:col,fillOpacity:.95}).addTo(gPts);
+    mk.bindPopup(popupHTML(c),{maxWidth:280,minWidth:260});
+    mk.on('click',()=>openViewer(c));
+  });
+}
+function popupHTML(c){
+  const im = c.imgUrl ? `<div class="pop-img-wrap"><img src="${c.imgUrl}"/></div>` : `<div class="pop-img-wrap"><span class="no-img">No image</span></div>`;
+  const leg=classLegend.find(l=>l.code===c.class_code);
+  return `<div style="width:260px">${im}<div class="pop-body">
+    <div class="pop-id">${c.id}</div>
+    <div class="pop-grid">
+      <div class="pf"><div class="pk">Azimuth</div><div class="pv">${c.azimuth}°</div></div>
+      <div class="pf"><div class="pk">Tilt</div><div class="pv">${c.tilt}°</div></div>
+      <div class="pf"><div class="pk">Project</div><div class="pv" style="font-size:.68rem">${c.project}</div></div>
+      <div class="pf"><div class="pk">Class</div><div class="pv" style="font-size:.68rem;color:${c.class_code?'var(--acc)':'var(--txt3)'}">${c.class_code||'—'}${leg?' '+leg.label:''}</div></div>
+    </div></div></div>`;
+}
+
+// ── rotation controls ──
+function setPreset(btn){
+  document.querySelectorAll('.rp-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); rotOffset=+btn.dataset.v; document.getElementById('cust-in').value=''; redraw();
+}
+function setCustom(v){ if(isNaN(v)||v<0) return; rotOffset=v%360; document.querySelectorAll('.rp-btn').forEach(b=>b.classList.remove('on')); redraw(); }
+function setDir(d){ rotDir=d; document.getElementById('dir-ccw').classList.toggle('on',d==='ccw'); document.getElementById('dir-cw').classList.toggle('on',d==='cw'); redraw(); }
+
+// ═══════════════════════════════════════════════════════════════
+// POINTS-ONLY GEOJSON EXPORT / IMPORT
+// Real GeoJSON (type:FeatureCollection) so it opens directly in
+// QGIS / GeoLibre / any GIS tool. schema/projects/legend ride along
+// as GeoJSON "foreign members" (allowed by RFC 7946 §6.1) so this
+// same file still round-trips fully back into the Annotate tab.
+// ═══════════════════════════════════════════════════════════════
+function exportPayload(){
+  return {
+    type:'FeatureCollection',
+    schema:'cropview-points-v1',
+    exported_at:new Date().toISOString(),
+    projects:[...new Set(captures.map(c=>c.project))].map(p=>({name:p,color:colorFor(p)})),
+    legend:classLegend,
+    features:captures.map(c=>({
+      type:'Feature',
+      geometry:{type:'Point',coordinates:[c.lon,c.lat]},
+      properties:{
+        uid:c.uid,id:c.id,project:c.project,source_zip:c.sourceZip,
+        alt:c.alt,azimuth:c.azimuth,tilt:c.tilt,hfov:c.hfov,
+        accuracy:c.accuracy,fpW:c.fpW,fpD:c.fpD,ts:c.ts,imgName:c.imgName,
+        class_code:c.class_code||'', deleted:!!c.deleted
+      }
+    }))
+  };
+}
+// Reads either format: current GeoJSON export, or the old flat
+// {points:[...]} files from earlier sessions — both normalise to
+// the same flat point-object shape used internally.
+function pointsFromPayload(data){
+  if(data && Array.isArray(data.points)) return data.points;
+  if(data && data.type==='FeatureCollection' && Array.isArray(data.features)){
+    return data.features.map(f=>{
+      const p=f.properties||{};
+      const co=(f.geometry&&f.geometry.coordinates)||[null,null];
+      return {
+        uid:p.uid, id:p.id, project:p.project, source_zip:p.source_zip,
+        lat:co[1], lon:co[0], alt:p.alt, azimuth:p.azimuth, tilt:p.tilt, hfov:p.hfov,
+        accuracy:p.accuracy, fpW:p.fpW, fpD:p.fpD, ts:p.ts, imgName:p.imgName,
+        class_code:p.class_code, deleted:p.deleted
+      };
+    });
+  }
+  return [];
+}
+function downloadPointsJSON(){
+  if(!captures.length){ showToast('No points to export'); return; }
+  const data=exportPayload();
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/geo+json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(batches.length===1?batches[0].name:'combined_'+batches.length+'sets')+'_points.geojson';
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast('GeoJSON exported ('+data.features.length+' points) — opens in QGIS/GeoLibre too','ok');
+}
+function handleAnnotDrop(ev){
+  ev.preventDefault(); ev.currentTarget.classList.remove('over');
+  const f = ev.dataTransfer.files[0];
+  if(f) handlePointsJSONFile(f); else showToast('Drop a .geojson / .json file');
+}
+function handlePointsJSONFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{ mergePointsFromJSON(JSON.parse(e.target.result)); }
+    catch(err){ showToast('Invalid JSON/GeoJSON: '+err.message); }
+  };
+  reader.readAsText(file);
+  document.getElementById('an-file-in').value='';
+}
+function mergePointsFromJSON(data){
+  const incoming = pointsFromPayload(data);
+  if(Array.isArray(data.legend)){
+    data.legend.forEach(le=>{ if(le.code && !classLegend.find(x=>x.code===le.code)) classLegend.push(le); });
+    saveLegend();
+  }
+  let updated=0, added=0;
+  incoming.forEach(p=>{
+    let existing = captures.find(c=>c.uid===p.uid);
+    if(!existing && p.id!=null) existing = captures.find(c=>c.id===p.id && c.project===p.project);
+    if(existing){
+      existing.class_code = p.class_code!=null ? p.class_code : existing.class_code;
+      existing.deleted = !!p.deleted;
+      updated++;
+    } else if(typeof p.lat==='number' && typeof p.lon==='number'){
+      captures.push({
+        uid:p.uid||((p.project||'Imported')+'::'+p.id), id:p.id, batchId:null,
+        project:p.project||'Imported', sourceZip:p.source_zip||'',
+        lat:p.lat, lon:p.lon, alt:p.alt||0, azimuth:p.azimuth||0, tilt:p.tilt||0, hfov:p.hfov||65,
+        accuracy:p.accuracy||0, fpW:p.fpW||0, fpD:p.fpD||0, fovPolyOrig:null,
+        imgName:p.imgName||'', imgUrl:null, imgB64:null, ts:p.ts||'',
+        class_code:p.class_code||'', deleted:!!p.deleted
+      });
+      colorFor(p.project||'Imported');
+      added++;
+    }
+  });
+  showToast(`Imported: ${updated} matched & updated, ${added} added`,'ok',4500);
+  updateUI(); if(mapReady) redraw(); refreshAnnotateList(); autosave();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTOSAVE / RESTORE
+// ═══════════════════════════════════════════════════════════════
+let autosaveTimer=null;
+function autosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(()=>{
+    try{ localStorage.setItem('cv_session', JSON.stringify(exportPayload())); }catch(e){}
+  },500);
+}
+function checkRestoreSession(){
+  const raw=localStorage.getItem('cv_session'); if(!raw) return;
+  try{
+    const data=JSON.parse(raw);
+    const pts=pointsFromPayload(data);
+    if(!pts.length) return;
+    document.getElementById('restore-banner').style.display='flex';
+    document.getElementById('restore-info').textContent = pts.length+' points, saved '+new Date(data.exported_at).toLocaleString();
+    window._pendingRestore=data;
+  }catch(e){}
+}
+function doRestore(){ if(window._pendingRestore){ mergePointsFromJSON(window._pendingRestore); initMap(); redraw(); } document.getElementById('restore-banner').style.display='none'; }
+function dismissRestore(){ document.getElementById('restore-banner').style.display='none'; localStorage.removeItem('cv_session'); }
+
+// ═══════════════════════════════════════════════════════════════
+// ANNOTATE TAB
+// ═══════════════════════════════════════════════════════════════
+function initAnnotMap(){
+  if(annotMap) return;
+  annotMap=L.map('an-map',{zoomControl:true}).setView([20.5,78.9],5);
+  L.tileLayer(CARTO_URL,{attribution:CARTO_ATTR,maxZoom:20}).addTo(annotMap);
+  annotLayer=L.layerGroup().addTo(annotMap);
+  annotMap.on('dragstart zoomstart', ()=>{ annotMap._userMoved=true; });
+}
+function getFilteredList(){
+  return captures.filter(c=>{
+    if(annotHideDeleted && c.deleted) return false;
+    if(annotFilterProject!=='__all__' && c.project!==annotFilterProject) return false;
+    if(annotOnlyUnassigned && c.class_code) return false;
+    return true;
+  });
+}
+function refreshAnnotateList(){
+  const projSel=document.getElementById('an-filter-project');
+  const projs=[...new Set(captures.map(c=>c.project))];
+  const cur=projSel.value;
+  projSel.innerHTML='<option value="__all__">All projects</option>'+projs.map(p=>`<option value="${p}">${p}</option>`).join('');
+  projSel.value = projs.includes(cur) ? cur : '__all__';
+  annotFilterProject = projSel.value;
+
+  const list = getFilteredList();
+  document.getElementById('an-count').textContent = list.length+' / '+captures.length+' points';
+  document.getElementById('an-sel-count').textContent = annotSelection.size;
+
+  const tbody=document.getElementById('an-tbody');
+  if(!list.length){
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt3);padding:24px">No points match the current filters.</td></tr>`;
+  } else {
+    tbody.innerHTML = list.map(c=>{
+      const sel=annotSelection.has(c.uid);
+      const leg=classLegend.find(l=>l.code===c.class_code);
+      const thumb = c.imgUrl
+        ? `<img src="${c.imgUrl}" style="width:36px;height:28px;object-fit:cover;border-radius:4px;display:block"/>`
+        : `<div style="width:36px;height:28px;border-radius:4px;background:var(--surf3);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--txt3)">—</div>`;
+      return `<tr class="an-row ${sel?'sel':''}" style="${c.deleted?'opacity:.45':''}">
+        <td><input type="checkbox" ${sel?'checked':''} onclick="toggleSel('${c.uid}',event)"/></td>
+        <td onclick="openLightboxFromRow('${c.uid}')">${thumb}</td>
+        <td onclick="focusPoint('${c.uid}')" style="font-size:.68rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.id}</td>
+        <td onclick="focusPoint('${c.uid}')" style="font-size:.68rem"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(c.project)};margin-right:5px"></span>${c.project}</td>
+        <td><input type="text" maxlength="2" value="${c.class_code||''}" placeholder="--" class="cc-in" onchange="setClassCode('${c.uid}',this.value)"/></td>
+        <td style="font-size:.63rem;color:var(--txt3)">${leg?leg.label:(c.class_code?'Unknown code':'—')}</td>
+        <td>${c.deleted
+          ? `<button class="mini-btn ok" onclick="restorePoint('${c.uid}')">Restore</button>`
+          : `<button class="mini-btn danger" onclick="deletePoint('${c.uid}')">Delete</button>`}</td>
+      </tr>`;
+    }).join('');
+  }
+  drawAnnotMap(list);
+  updateAnnotBadge();
+  updateStats();
+}
+function toggleSel(uid,ev){ ev.stopPropagation(); if(annotSelection.has(uid)) annotSelection.delete(uid); else annotSelection.add(uid); refreshAnnotateList(); }
+function selectAllFiltered(){ getFilteredList().forEach(c=>annotSelection.add(c.uid)); refreshAnnotateList(); }
+function clearSelection(){ annotSelection.clear(); refreshAnnotateList(); }
+function setClassCode(uid,val){
+  const c=captures.find(x=>x.uid===uid); if(!c) return;
+  c.class_code=(val||'').trim().slice(0,2);
+  autosave(); refreshAnnotateList();
+  if(annotFocused && annotFocused.uid===uid) renderFocusCard(c);
+}
+function applyBulkCode(){
+  const val=document.getElementById('an-bulk-code').value.trim().slice(0,2);
+  if(!val){ showToast('Enter a class code first'); return; }
+  if(!annotSelection.size){ showToast('No points selected'); return; }
+  captures.forEach(c=>{ if(annotSelection.has(c.uid)) c.class_code=val; });
+  showToast(`Applied "${val}" to ${annotSelection.size} point(s)`,'ok');
+  autosave(); refreshAnnotateList();
+}
+function deletePoint(uid){ const c=captures.find(x=>x.uid===uid); if(c){ c.deleted=true; annotSelection.delete(uid); } autosave(); refreshAnnotateList(); }
+function restorePoint(uid){ const c=captures.find(x=>x.uid===uid); if(c) c.deleted=false; autosave(); refreshAnnotateList(); }
+function bulkDelete(){ if(!annotSelection.size){ showToast('No points selected'); return; } captures.forEach(c=>{ if(annotSelection.has(c.uid)) c.deleted=true; }); annotSelection.clear(); autosave(); refreshAnnotateList(); }
+function bulkRestore(){ if(!annotSelection.size){ showToast('No points selected'); return; } captures.forEach(c=>{ if(annotSelection.has(c.uid)) c.deleted=false; }); autosave(); refreshAnnotateList(); }
+
+function focusPoint(uid){
+  const c=captures.find(x=>x.uid===uid); if(!c) return;
+  annotFocused=c;
+  if(annotMap && typeof c.lat==='number'){ annotMap._userMoved=true; annotMap.setView([c.lat,c.lon], Math.max(annotMap.getZoom(),16)); }
+  renderFocusCard(c);
+}
+function renderFocusCard(c){
+  const el=document.getElementById('an-focus');
+  if(!c){ el.style.display='none'; return; }
+  el.style.display='block';
+  const leg=classLegend.find(l=>l.code===c.class_code);
+  el.innerHTML=`<div style="display:flex;gap:10px">
+    <div style="width:100px;height:78px;border-radius:8px;overflow:hidden;background:var(--surf3);flex-shrink:0;cursor:zoom-in" onclick="${c.imgUrl?`openLightboxFor(captures.find(x=>x.uid==='${c.uid}'), getFilteredList().filter(x=>x.imgUrl), 'annotate')`:''}">
+      ${c.imgUrl?`<img src="${c.imgUrl}" style="width:100%;height:100%;object-fit:cover"/>`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--txt3);font-size:.62rem">no image</div>'}
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;font-size:.76rem;color:var(--acc);word-break:break-all">${c.id}</div>
+      <div style="font-size:.65rem;color:var(--txt3);margin:3px 0">${c.project}<br/>${(+c.lat).toFixed(5)}, ${(+c.lon).toFixed(5)}</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+        <input type="text" maxlength="2" value="${c.class_code||''}" class="cc-in" onchange="setClassCode('${c.uid}',this.value)"/>
+        <span style="font-size:.65rem;color:var(--txt2)">${leg?leg.label:(c.class_code?'Unknown code':'Unassigned')}</span>
+      </div>
+      ${c.deleted?`<button class="mini-btn ok" style="margin-top:6px" onclick="restorePoint('${c.uid}');renderFocusCard(captures.find(x=>x.uid==='${c.uid}'))">Restore point</button>`
+                  :`<button class="mini-btn danger" style="margin-top:6px" onclick="deletePoint('${c.uid}');renderFocusCard(captures.find(x=>x.uid==='${c.uid}'))">Delete point</button>`}
+    </div></div>`;
+}
+function drawAnnotMap(list){
+  if(!annotMap) return;
+  annotLayer.clearLayers();
+  const bounds=[];
+  list.forEach(c=>{
+    if(typeof c.lat!=='number') return;
+    bounds.push([c.lat,c.lon]);
+    const isSel=annotSelection.has(c.uid);
+    const col = c.class_code ? colorFor(c.project) : '#64748b';
+    const mk=L.circleMarker([c.lat,c.lon],{radius:isSel?11:7,color:isSel?'#fff':'#0b0f1a',weight:isSel?3:1.5,fillColor:col,fillOpacity:.9}).addTo(annotLayer);
+    mk.on('click',()=>{ if(annotSelection.has(c.uid)) annotSelection.delete(c.uid); else annotSelection.add(c.uid); focusPoint(c.uid); refreshAnnotateList(); });
+  });
+  if(bounds.length && !annotMap._userMoved) annotMap.fitBounds(bounds,{padding:[30,30],maxZoom:17});
+}
+
+// ── legend editor ──
+function saveLegend(){ localStorage.setItem('cv_legend', JSON.stringify(classLegend)); renderLegendEditor(); refreshAnnotateList(); }
+function renderLegendEditor(){
+  const el=document.getElementById('legend-list');
+  el.innerHTML = classLegend.map((l,i)=>`
+    <div class="legend-row">
+      <input class="code" value="${l.code}" maxlength="2" onchange="classLegend[${i}].code=this.value.trim().slice(0,2);saveLegend()"/>
+      <input class="label" value="${l.label}" onchange="classLegend[${i}].label=this.value;saveLegend()"/>
+      <button class="mini-btn danger" onclick="classLegend.splice(${i},1);saveLegend()">×</button>
+    </div>`).join('');
+}
+function addLegendRow(){ classLegend.push({code:'',label:''}); saveLegend(); }
+
+// ═══════════════════════════════════════════════════════════════
+// LIGHTBOX — rich: prev/next nav, detail panel, mini-map.
+// Shared by both tabs; lbContext controls whether the class-code
+// editor / delete-restore controls show in the details panel.
+// ═══════════════════════════════════════════════════════════════
+function openLightboxFor(c, list, context){
+  if(!c || !c.imgUrl) return;
+  lbList = (list && list.length) ? list : [c];
+  lbIndex = lbList.findIndex(x=>x.uid===c.uid);
+  if(lbIndex<0){ lbList=[c]; lbIndex=0; }
+  lbContext = context || 'map';
+  const lb=document.getElementById('lightbox');
+  lb.style.display='flex';
+  requestAnimationFrame(()=>lb.classList.add('show'));
+  renderLightbox();
+}
+function openLightboxFromRow(uid){
+  const c=captures.find(x=>x.uid===uid); if(!c) return;
+  focusPoint(uid);
+  if(c.imgUrl) openLightboxFor(c, getFilteredList().filter(x=>x.imgUrl), 'annotate');
+}
+function renderLightbox(){
+  const c = lbList[lbIndex]; if(!c) return;
+  document.getElementById('lb-img').src = c.imgUrl || c.imgB64 || '';
+  document.querySelectorAll('.lb-arrow').forEach(a=>a.disabled = lbList.length<=1);
+  updateLBMini(c);
+
+  const leg = classLegend.find(l=>l.code===c.class_code);
+  let annotEditHtml='';
+  if(lbContext==='annotate'){
+    annotEditHtml = `
+      <div class="lb-row">
+        <div class="lb-lbl">Class code</div>
+        <div style="display:flex;gap:7px;align-items:center;margin-top:2px">
+          <input type="text" maxlength="2" value="${c.class_code||''}" class="cc-in" style="width:52px"
+            onchange="setClassCode('${c.uid}',this.value);renderLightbox()"/>
+          <span style="font-size:.7rem;color:var(--txt2)">${leg?leg.label:(c.class_code?'Unknown code':'Unassigned')}</span>
+        </div>
+        <div style="margin-top:9px">
+          ${c.deleted
+            ? `<button class="mini-btn ok" onclick="restorePoint('${c.uid}');renderLightbox()">Restore point</button>`
+            : `<button class="mini-btn danger" onclick="deletePoint('${c.uid}');renderLightbox()">Delete point</button>`}
+        </div>
+      </div>`;
+  }
+
+  document.getElementById('lb-details-content').innerHTML = `
+    <div class="lb-row"><div class="lb-lbl">Capture ID</div><div class="lb-val">${c.id}</div></div>
+    <div class="lb-row"><div class="lb-lbl">Project</div><div class="lb-val" style="color:${colorFor(c.project)}">${c.project}</div></div>
+    <div class="lb-row"><div class="lb-lbl">Latitude</div><div class="lb-val">${(+c.lat).toFixed(6)}</div></div>
+    <div class="lb-row"><div class="lb-lbl">Longitude</div><div class="lb-val">${(+c.lon).toFixed(6)}</div></div>
+    <div class="lb-row"><div class="lb-lbl">Azimuth</div><div class="lb-val" style="color:#f59e0b">${c.azimuth}°</div></div>
+    <div class="lb-row"><div class="lb-lbl">Tilt</div><div class="lb-val" style="color:#34d399">${c.tilt}°</div></div>
+    <div class="lb-row"><div class="lb-lbl">HFOV</div><div class="lb-val" style="color:#a78bfa">${c.hfov}°</div></div>
+    <div class="lb-row"><div class="lb-lbl">Altitude</div><div class="lb-val" style="color:#38bdf8">${(+c.alt).toFixed(1)}m</div></div>
+    <div class="lb-row"><div class="lb-lbl">Accuracy</div><div class="lb-val">±${(+c.accuracy).toFixed(2)}m</div></div>
+    <div class="lb-row"><div class="lb-lbl">Footprint</div><div class="lb-val">${(+c.fpW).toFixed(0)}m × ${(+c.fpD).toFixed(0)}m</div></div>
+    <div class="lb-row"><div class="lb-lbl">Date / Time</div><div class="lb-val" style="font-size:.74rem">${c.ts?new Date(c.ts).toLocaleString():'—'}</div></div>
+    ${annotEditHtml}
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(34,211,238,.1);font-size:.58rem;color:var(--txt3);line-height:1.6">
+      <strong style="color:var(--txt2)">CropView</strong><br/>Somdeep Kundu · RuDRA, C-TARA · IIT Bombay
+    </div>`;
+
+  // keep the underlying tab in sync with whichever point is showing
+  if(lbContext==='map'){
+    selectedCapture=c; openViewer(c);
+    if(theMap) theMap.setView([c.lat,c.lon], Math.max(theMap.getZoom(),16));
+  } else {
+    annotFocused=c; focusPoint(c.uid);
+  }
+}
+function initLBMini(){
+  if(lbMiniMap) return;
+  lbMiniMap = L.map('lb-mini',{zoomControl:false,attributionControl:false,scrollWheelZoom:false});
+  L.tileLayer(CARTO_URL,{attribution:CARTO_ATTR,maxZoom:20}).addTo(lbMiniMap);
+  lbMiniLayer = L.layerGroup().addTo(lbMiniMap);
+}
+function updateLBMini(c){
+  initLBMini();
+  lbMiniLayer.clearLayers();
+  lbMiniMap.setView([c.lat,c.lon], 14);
+  captures.filter(x=>!x.deleted && typeof x.lat==='number' && Math.hypot(x.lat-c.lat,x.lon-c.lon)<0.06)
+    .forEach(x=>{
+      const cur = x.uid===c.uid;
+      L.circleMarker([x.lat,x.lon],{radius:cur?9:5,color:cur?'#fff':'#0b0f1a',weight:cur?3:1,
+        fillColor:colorFor(x.project),fillOpacity:cur?1:.65}).addTo(lbMiniLayer);
+    });
+  setTimeout(()=>lbMiniMap && lbMiniMap.invalidateSize(),80);
+}
+function navLightbox(dir){
+  if(lbList.length<=1) return;
+  lbIndex = (lbIndex+dir+lbList.length)%lbList.length;
+  renderLightbox();
+}
+function closeLightbox(){
+  const lb=document.getElementById('lightbox');
+  lb.classList.remove('show');
+  setTimeout(()=>{ lb.style.display='none'; document.getElementById('lb-img').src=''; },260);
+}
+document.addEventListener('keydown', e=>{
+  const lb=document.getElementById('lightbox');
+  if(!lb.classList.contains('show')) return;
+  if(['ArrowLeft','ArrowRight',' ','Escape','i','I','d','D'].includes(e.key)) e.preventDefault();
+  switch(e.key){
+    case 'Escape': closeLightbox(); break;
+    case 'ArrowLeft': navLightbox(-1); break;
+    case 'ArrowRight': navLightbox(1); break;
+    case ' ': navLightbox(1); break;
+    case 'i': case 'I': case 'd': case 'D':
+      lbDetailsVisible = !lbDetailsVisible;
+      document.getElementById('lb-details').style.display = lbDetailsVisible ? 'block' : 'none';
+      break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+initCollapsibles();
+renderLegendEditor();
+checkRestoreSession();
+</script>
+</body>
+</html>
