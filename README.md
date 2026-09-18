@@ -10,4 +10,4 @@ A free, open-source, single-file PWA for field researchers and agronomists. Poin
 
 **Quick Links**
 * **[Launch CropView v3 App](https://somdeepkundu.github.io/cropview-v3/)**
-* **[CropView ZIP Uploader](https://somdeepkundu.github.io/cropview-v3/cropview-zip-uploader.html)**
+* **[CropView ZIP Uploader](https://somdeepkundu.github.io/cropview-v3/cropview-viewer-v2.html)**
