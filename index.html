@@ -328,7 +328,7 @@
   <div id="about-box">
     <div id="about-x" onclick="closeAboutDirect()">✕</div>
     <div class="alogo">CROP<span>VIEW</span></div>
-    <div class="aver">Version 3.1.0 · Layer 1 of 3 · 2026 · Footprint Geometry Fix</div>
+    <div class="aver">Version 3.2.0 · Layer 1 of 3 · 2026 · Camera Heading Fix</div>
 
     <div class="asec">
       <h4>👨‍🔬 Developed By</h4>
@@ -362,6 +362,7 @@
     <div class="asec">
       <h4>🧭 What's new in v3</h4>
       <p>The heading pipeline no longer trusts a single browser event. It watches its own sensor stream, throws out invalid readings instead of quietly defaulting to North, notices when a phone-specific bug freezes the compass, and silently resubscribes and recovers. If it truly can't get a fix, it says so instead of showing you a confident, wrong cone. Tap the compass any time to force a recalibration.</p>
+      <p><b>v3.2:</b> the heading is now always where the <i>camera</i> points, never the direction you are travelling — so side-looking shots from a vehicle are recorded correctly, and the map cone follows the phone live, even when held upright.</p>
     </div>
 
     <div class="asec">
@@ -392,7 +393,7 @@
 
   <!-- HEADER -->
 <div id="header">
-  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.1.0</span><span class="proj" id="hproj">—</span></div>
+  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.2.0</span><span class="proj" id="hproj">—</span></div>
   <div id="hdr-right">
     <span id="cap-badge">0 cap</span>
     <div id="gps-btn" onclick="openGPS()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s">📡 GPS</div>
@@ -555,13 +556,12 @@ const S = {
                        // This is what the footprint geometry scales with; S.alt
                        // (height above sea level) must never be used here.
   // ── heading fusion (v3) ──
-  compassRaw:0,        // platform-corrected compass heading (true CW from north)
-  compassOffset:0,     // running calibration vs GPS truth
-  heading:0,           // fused heading used for the FOV polygon + exports
+  compassRaw:0,        // rear-camera heading from the orientation sensor (CW from north)
+  heading:0,           // camera heading used for the FOV polygon + exports
   headingSrc:'—',      // active heading source label
   signalState:'OK',    // OK | STALE | LOST — compass-stream health, see watchdogTick()
   lowConfidence:false, // iOS: webkitCompassAccuracy says the reading is untrustworthy
-  gpsBearing:null,     // last GPS movement bearing
+  gpsBearing:null,     // last GPS TRAVEL bearing — metadata only, never the camera heading
   gpsBearingTime:0,    // timestamp of that bearing
   prevFix:null,        // previous GPS fix, for bearing calc
   // ── compass stream health (v3) ──
@@ -577,7 +577,7 @@ const S = {
   stage:null,
   caps:[],
   facing:'environment',stream:null,
-  map:null,umark:null,fovL:null,capL:null,fpL:null,
+  map:null,umark:null,fovL:null,rayL:null,capL:null,fpL:null,
   sat:false,tile:null,
   proj:{name:'',notes:'',t:''}
 };
@@ -647,31 +647,68 @@ function tiltFromEvent(e){
 }
 function lerpAngle(a,b,t){ let d=((b-a+540)%360)-180; return ((a+d*t)%360+360)%360; }
 
-function fuseHeading(){
-  const compass = ((S.compassRaw + S.compassOffset) % 360 + 360) % 360;
-  S.az = Math.round(compass);
-  const now = Date.now();
-  const gpsFresh = S.gpsBearing!==null && (now-S.gpsBearingTime) < 6000;
-  const oriAge = S.lastValidOriTime ? now-S.lastValidOriTime : Infinity;
+/* Heading of the REAR CAMERA axis (device -z), clockwise from north, from
+   the full W3C rotation R = Rz(alpha)·Rx(beta)·Ry(gamma), world = E,N,Up.
+   v3.1 used (360 - alpha + screenAngle), which is only right with the phone
+   near flat. Held upright (beta ≈ 90°, the normal way to shoot a field),
+   ZXY Euler angles hit gimbal lock: Chrome can report alpha and gamma
+   jumping together by ~180°, which leaves the physical rotation unchanged
+   but flips a heading built from alpha alone. The rotation matrix is
+   continuous through that, and describes the camera axis directly, so no
+   screen-orientation correction is needed (portrait or landscape).
+   When the camera points almost straight down its horizontal direction is
+   undefined, so we fall back to the direction of the phone's top edge. */
+function cameraHeading(alpha, beta, gamma){
+  const d=Math.PI/180;
+  const cA=Math.cos(alpha*d), sA=Math.sin(alpha*d);
+  const cB=Math.cos(beta*d),  sB=Math.sin(beta*d);
+  const cG=Math.cos(gamma*d), sG=Math.sin(gamma*d);
+  const east  = -(cA*sG + cG*sA*sB);
+  const north =   cA*cG*sB - sA*sG;
+  if(Math.hypot(east,north) < 0.17){          // camera within ~10° of nadir/zenith
+    return ((Math.atan2(-cB*sA, cA*cB)/d) + 360) % 360;   // phone-top direction
+  }
+  return ((Math.atan2(east, north)/d) + 360) % 360;
+}
 
-  if(gpsFresh){
-    // pure geometry — immune to every compass-convention/sensor bug
-    S.heading = S.gpsBearing;
-    S.headingSrc = 'GPS MOVE';
-    S.signalState = 'OK';
-  } else if(oriAge < STALE_MS){
-    S.heading = compass;
-    S.headingSrc = S.lowConfidence ? 'COMPASS·LOW-CONF' : (Math.abs(S.compassOffset) > 1 ? 'COMPASS·CAL' : 'COMPASS');
+/* v3.2: the camera heading comes ONLY from the orientation sensor.
+   v2/v3.1 let the GPS travel bearing override the compass whenever the
+   phone had moved >=3 m in the last 6 s, and also used it to "auto-
+   calibrate" a compass offset. Both assumed the camera faces the direction
+   of travel. From a vehicle (or walking and shooting sideways) that is
+   false: every capture got the car's direction, the cone ignored phone
+   rotation, and the learned offset kept rotating the compass toward the
+   road even after stopping. GPS jitter of a few metres while standing
+   still triggered the same lock. The travel bearing is now kept only as
+   metadata (travel_bearing_deg / look_side in the export). */
+function fuseHeading(){
+  const compass = ((S.compassRaw % 360) + 360) % 360;
+  S.az = Math.round(compass);
+  const oriAge = S.lastValidOriTime ? Date.now()-S.lastValidOriTime : Infinity;
+  S.heading = compass; // always the last sensor reading; the label says how much to trust it
+  if(oriAge < STALE_MS){
+    S.headingSrc = S.lowConfidence ? 'COMPASS·LOW-CONF' : 'COMPASS';
     S.signalState = S.lowConfidence ? 'STALE' : 'OK';
   } else if(oriAge < LOST_MS){
-    S.heading = compass; // hold last known reading rather than blank the cone
     S.headingSrc = 'STALE·HOLD';
     S.signalState = 'STALE';
   } else {
-    S.heading = compass;
     S.headingSrc = 'SIGNAL LOST';
     S.signalState = 'LOST';
   }
+}
+
+/* Travel bearing (GPS) — fresh only if we moved recently. Metadata only. */
+function travelBearing(){
+  return (S.gpsBearing!==null && (Date.now()-S.gpsBearingTime) < 6000) ? S.gpsBearing : null;
+}
+/* Where the camera looks relative to the direction of travel. */
+function lookSide(rel){
+  if(rel===null) return null;
+  const a=Math.abs(rel);
+  if(a<=30) return 'AHEAD';
+  if(a>=150) return 'BEHIND';
+  return rel<0 ? 'LEFT' : 'RIGHT';
 }
 
 /* ── PERMISSIONS ── */
@@ -740,24 +777,20 @@ function startGPS(){
       S.lat=g.lat; S.lon=g.lon; S.alt=g.alt;
       S.acc=g.acc; S.altAcc=g.altAcc; S.gpsSamples=g.samples;
 
-      /* ── GPS movement bearing (v2/v3) ──
-         Pure geometry — immune to every compass-convention bug.
-         When the user walks ≥3 m with a usable fix, derive a true
-         bearing and use it to (a) drive the heading directly and
-         (b) auto-calibrate the compass offset for when they stop. */
+      /* ── GPS travel bearing ──
+         Direction of MOVEMENT, not of the camera. Recorded as metadata
+         only (see fuseHeading). Needs a real move, not GPS jitter:
+         the step must exceed the fix accuracy as well as 3 m. */
       if(S.prevFix){
         const moved = turf.distance(
           turf.point([S.prevFix.lon,S.prevFix.lat]),
           turf.point([g.lon,g.lat]), {units:'meters'});
-        if(moved >= 3 && g.acc < 25){
+        if(moved >= Math.max(3, g.acc) && g.acc < 25){
           const br = (turf.bearing(
             turf.point([S.prevFix.lon,S.prevFix.lat]),
             turf.point([g.lon,g.lat])) + 360) % 360;
           S.gpsBearing = br;
           S.gpsBearingTime = Date.now();
-          // smooth the compass-vs-GPS offset (shortest angular diff)
-          const diff = ((br - S.compassRaw + 540) % 360) - 180;
-          S.compassOffset = S.compassOffset*0.7 + diff*0.3;
           S.prevFix = {lat:g.lat, lon:g.lon};
         }
       } else {
@@ -823,12 +856,15 @@ function trackAlphaChange(raw){
   S.lastAlphaSeen = raw;
 }
 
-function applyHeading(headingDeg, tiltDeg){
+function applyTilt(e){
+  const t = tiltFromEvent(e);
+  if(t !== null){ S.tilt = t; updTilt(); }  // null => hold last good tilt, never invent one
+}
+function applyHeading(headingDeg){
   S.compassRaw = (headingDeg%360+360)%360;
   S.lastValidOriTime = Date.now();
-  if(tiltDeg !== null) S.tilt = tiltDeg;  // null => hold last good tilt, never invent one
   fuseHeading();
-  updTilt(); updHUD(); updData();
+  updHUD(); updData();
 }
 
 function onOriAbs(e){
@@ -837,18 +873,25 @@ function onOriAbs(e){
   // Latch ONLY here, below the validation. Latching on the bare event (as v3.0
   // did) let a single alpha===null absolute event kill the relative fallback
   // permanently — the compass then never recovered.
+  if(e.beta===null || e.gamma===null || isNaN(e.beta) || isNaN(e.gamma)) return;
   S.gotAbsolute = true;
   trackAlphaChange(e.alpha);
-  // Android deviceorientationabsolute — alpha increases COUNTER-clockwise.
-  // True compass heading = (360 - alpha), plus screen-orientation correction.
-  applyHeading((360 - e.alpha + screenAngle()) % 360, tiltFromEvent(e));
+  applyTilt(e);
+  applyHeading(cameraHeading(e.alpha, e.beta, e.gamma));
 }
 function onOriRel(e){
+  // Tilt (beta/gamma) is gravity-referenced, so it is valid from either stream.
+  applyTilt(e);
   if(S.gotAbsolute) return; // a valid absolute stream is alive — ignore the relative one
   S.lastAnyOriTime = Date.now();
+  // Chrome/Android's plain 'deviceorientation' alpha is RELATIVE to an
+  // arbitrary start direction. Using it as a compass (v3.1 did, briefly,
+  // after every resync) gives a confident, meaningless heading.
+  if(e.absolute !== true) return;
   if(e.alpha===null || e.alpha===undefined || isNaN(e.alpha)) return;
+  if(e.beta===null || e.gamma===null || isNaN(e.beta) || isNaN(e.gamma)) return;
   trackAlphaChange(e.alpha);
-  applyHeading((360 - e.alpha + screenAngle()) % 360, tiltFromEvent(e));
+  applyHeading(cameraHeading(e.alpha, e.beta, e.gamma));
 }
 function onOriIOS(e){
   S.lastAnyOriTime = Date.now();
@@ -858,7 +901,8 @@ function onOriIOS(e){
   const acc = e.webkitCompassAccuracy; // degrees; -1 or a large value means "don't trust this"
   S.lowConfidence = (typeof acc==='number') && (acc<0 || acc>40);
   // iOS — already a true compass heading, clockwise from north
-  applyHeading(h, tiltFromEvent(e));
+  applyTilt(e);
+  applyHeading(h);
 }
 function onMotion(){ S.lastMotionTime = Date.now(); } // heartbeat only — proves the sensor stack is alive
 
@@ -936,12 +980,13 @@ function updTilt(){
   oz.style.top=oTop+'px'; oz.style.height=(oBot-oTop)+'px';
   const pinEl = document.getElementById('tilt-pin');
   pinEl.style.top=pin+'px';
-  const ok = t>=28&&t<=55&&t<TILT_MAX;
+  const ok = t>=28&&t<=55;
   pinEl.className = ok?'':'warn'; pinEl.id='tilt-pin';
   const degEl = document.getElementById('tilt-deg');
   degEl.textContent=t+'°'; degEl.className=ok?'':'warn'; degEl.id='tilt-deg';
   const lbl = document.getElementById('tilt-lbl');
-  if(t>=TILT_MAX) lbl.textContent='SKY ✕';
+  if(S.lat && !calcFP()) lbl.textContent='SKY ✕';
+  else if(t>=TILT_MAX) lbl.textContent='HORIZON';
   else if(t<15) lbl.textContent='FLAT';
   else if(t>65) lbl.textContent='STEEP';
   else if(ok) lbl.textContent='✓ GOOD';
@@ -987,10 +1032,10 @@ function updData(){
   set('d-smp',S.gpsSamples>0?S.gpsSamples+' / '+GPS_BUF_MAX+' (drop-worst averaging)':null);
   set('d-alt',S.alt?S.alt.toFixed(1)+' m':null);
   set('d-az',Math.round(S.heading)+'° '+azLbl(S.heading)+'  ['+S.headingSrc+']');
-  set('d-tilt',S.tilt+'° from nadir'+(S.tilt>=TILT_MAX?' — above horizon':''));
+  set('d-tilt',S.tilt+'° from nadir'+(S.tilt>90?' — above horizon':(S.tilt>=TILT_MAX?' — at horizon':'')));
   set('d-camh',S.camH.toFixed(2)+' m above ground');
   const fp=calcFP();
-  set('d-fp',fp?fp.w.toFixed(1)+' × '+fp.d.toFixed(1)+' m':(S.lat?'— (aimed at/above horizon)':null));
+  set('d-fp',fp?fp.w.toFixed(1)+' × '+fp.d.toFixed(1)+' m'+(fp.farCapped?' (far edge clipped)':''):(S.lat?'— (aimed above horizon)':null));
 }
 function azLbl(a){return['N','NE','E','SE','S','SW','W','NW','N'][Math.round(a/45)%8];}
 
@@ -1010,28 +1055,35 @@ function azLbl(a){return['N','NE','E','SE','S','SW','W','NW','N'][Math.round(a/4
    tangent, since FOV angles do not scale linearly with aspect ratio. */
 const TILT_MAX = 85;   // beyond this the ray is effectively at/above the horizon
 
+/* v3.2: v3.1 returned null (no cone, capture blocked) as soon as the
+   camera CENTRE reached 85° — i.e. whenever the phone was held upright to
+   look across a field. The lower half of that frame still sees ground, so
+   now the footprint is dropped only when the BOTTOM edge of the frame is
+   at/above the cap; otherwise the far edge is clipped at the cap and the
+   footprint is flagged farCapped. */
 function calcFP(){
   if(!S.lat||!S.lon) return null;
   const H = S.camH, t = S.tilt;
-  if(!isFinite(t) || t >= TILT_MAX) return null;   // no usable ground intersection
+  if(!isFinite(t)) return null;
   const tr = t*Math.PI/180;
   const hr = S.fov*Math.PI/180;
   const vr = 2*Math.atan(Math.tan(hr/2)*(9/16));   // 16:9 sensor, correct tangent form
   const cap = TILT_MAX*Math.PI/180;
   const tNear = Math.max(tr - vr/2, 0);
+  if(tNear >= cap) return null;                     // whole frame at/above the horizon
   const tFar  = Math.min(tr + vr/2, cap);
   const near = H*Math.tan(tNear);
   const far  = H*Math.tan(tFar);
-  const gd   = H*Math.tan(tr);
+  const gd   = H*Math.tan(Math.min(tr, cap));
   const halfW = r => Math.sqrt(H*H + r*r)*Math.tan(hr/2);
   return {near, far, gd, wNear:halfW(near)*2, wFar:halfW(far)*2,
-          w: halfW(gd)*2, d: far - near};
+          w: halfW(gd)*2, d: far - near, farCapped: (tr + vr/2) > cap};
 }
-function calcPoly(){
+function calcPoly(heading){
   if(!S.lat||!S.lon) return null;
   const fp=calcFP(); if(!fp) return null;
-  // Project FORWARD along the fused true heading — no offset hacks.
-  const O=turf.point([S.lon,S.lat]), b=((S.heading%360)+360)%360;
+  const h = (heading===undefined) ? S.heading : heading;
+  const O=turf.point([S.lon,S.lat]), b=((h%360)+360)%360;
   const at=(r,off)=>{
     const c=turf.destination(O, r/1000, b).geometry.coordinates;
     return off===0 ? c : turf.destination(turf.point(c), Math.abs(off)/1000, b+(off>0?90:-90)).geometry.coordinates;
@@ -1058,11 +1110,28 @@ function updMapPos(){
   } else S.umark.setLatLng([S.lat,S.lon]);
   updFov();
 }
+/* Live cone. v3.1 destroyed and rebuilt the polygon every 120 ms and drew
+   it from the raw heading. Now the layers are created once and moved with
+   setLatLngs (cheap on low-end phones), drawn from the smoothed display
+   heading, skipped while the map tab is hidden, and a look-direction ray
+   is always shown — even when the camera is above the horizon — so you
+   can see where the phone is pointing before you capture. */
+const RAY_M = 40;
 function updFov(){
-  if(!S.map) return;
-  if(S.fovL){S.map.removeLayer(S.fovL);S.fovL=null;}
-  const c=calcPoly(); if(!c) return;
-  S.fovL=L.polygon(c.map(p=>[p[1],p[0]]),{color:'#4cff72',weight:1.5,fillColor:'#4cff72',fillOpacity:.12,dashArray:'4 4'}).addTo(S.map);
+  if(!S.map || !S.lat || !S.lon) return;
+  const mp = document.getElementById('map-panel');
+  if(mp && !mp.classList.contains('active')) return;
+  const h = S.dispAz;
+  const col = S.signalState==='OK' ? '#4cff72' : (S.signalState==='STALE' ? '#ffb347' : '#ff5c5c');
+  const tip = turf.destination(turf.point([S.lon,S.lat]), RAY_M/1000, h).geometry.coordinates;
+  const ray = [[S.lat,S.lon],[tip[1],tip[0]]];
+  if(!S.rayL) S.rayL = L.polyline(ray,{color:col,weight:2,opacity:.9}).addTo(S.map);
+  else { S.rayL.setLatLngs(ray); S.rayL.setStyle({color:col}); }
+  const c = calcPoly(h);
+  if(!c){ if(S.fovL){ S.map.removeLayer(S.fovL); S.fovL=null; } return; }
+  const ll = c.map(p=>[p[1],p[0]]);
+  if(!S.fovL) S.fovL = L.polygon(ll,{color:col,weight:1.5,fillColor:col,fillOpacity:.12,dashArray:'4 4'}).addTo(S.map);
+  else { S.fovL.setLatLngs(ll); S.fovL.setStyle({color:col,fillColor:col}); }
 }
 function centerMe(){if(S.lat&&S.lon)S.map.setView([S.lat,S.lon],18);else toast('Waiting for GPS…','err');}
 function toggleSat(){
@@ -1087,11 +1156,15 @@ function doCapture(){
   const sl=document.createElement('div');sl.className='scanl';
   document.getElementById('vcont').appendChild(sl);setTimeout(()=>sl.remove(),700);
   const fp=calcFP(), poly=calcPoly();
-  if(!fp) { toast('Camera is at/above the horizon — tilt down before capturing','err'); return; }
+  if(!fp) { toast('Camera is above the horizon — tilt down before capturing','err'); return; }
+  if(S.signalState==='LOST') toast('No compass fix — heading for this shot is unreliable','err');
+  const tb = travelBearing();
+  const rel = tb===null ? null : Math.round(((S.heading - tb + 540) % 360) - 180);
   const cap={id:'CV-'+Date.now(),imgName:nm,timestamp:now.toISOString(),project:S.proj.name,
     lat:S.lat,lon:S.lon,altitude:S.alt,accuracy:S.acc,az:Math.round(S.heading),
     headingSrc:S.headingSrc,tilt:S.tilt,camH:S.camH,fov:S.fov,
-    stage:S.stage,fp:fp?{w:fp.w,d:fp.d}:null,poly,thumb,full};
+    travelBrg: tb===null ? null : Math.round(tb), lookRel: rel, lookSide: lookSide(rel),
+    stage:S.stage,fp:fp?{w:fp.w,d:fp.d,farCapped:!!fp.farCapped}:null,poly,thumb,full};
   S.caps.unshift(cap); saveCaps(); pinOnMap(cap); rendList();
   document.getElementById('cap-badge').textContent=S.caps.length+' cap';
   toast('Saved: '+nm.substring(0,28)+'…','ok');
@@ -1192,19 +1265,21 @@ async function doZIP(){
 
 function buildGJ(){
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.1.0',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
+    metadata:{app:'CropView L1',version:'3.2.0',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
     features:S.caps.map(c=>({type:'Feature',
       geometry:{type:'Point',coordinates:[c.lon,c.lat,c.altitude||0]},
       properties:{id:c.id,imgName:(c.imgName||c.id)+'.jpg',timestamp:c.timestamp,project:c.project,
         heading_deg:c.az,azimuth_deg:c.az,heading_source:c.headingSrc||null,
         tilt_deg_from_nadir:c.tilt,tilt_deg:c.tilt,camera_height_m:c.camH??null,
         hfov_deg:c.fov,gps_accuracy_m:c.accuracy,kc_stage:c.stage,
-        footprint_width_m:c.fp?.w||null,footprint_depth_m:c.fp?.d||null},
+        footprint_width_m:c.fp?.w||null,footprint_depth_m:c.fp?.d||null,
+        footprint_far_capped:c.fp?.farCapped??null,
+        travel_bearing_deg:c.travelBrg??null,look_rel_travel_deg:c.lookRel??null,look_side:c.lookSide??null},
       ...(c.poly?{fov_polygon:{type:'Polygon',coordinates:[c.poly]}}:{})}))};
 }
 function buildCSV(){
-  const h=['id','imgName','timestamp','project','lat','lon','altitude','accuracy_m','azimuth_deg','tilt_deg_from_nadir','camera_height_m','hfov_deg','kc_stage','fp_w_m','fp_d_m'];
-  const r=S.caps.map(c=>[c.id,(c.imgName||c.id)+'.jpg',c.timestamp,c.project,c.lat,c.lon,c.altitude||'',c.accuracy||'',c.az,c.tilt,c.camH??'',c.fov,c.stage||'',c.fp?.w||'',c.fp?.d||'']);
+  const h=['id','imgName','timestamp','project','lat','lon','altitude','accuracy_m','azimuth_deg','tilt_deg_from_nadir','camera_height_m','hfov_deg','kc_stage','fp_w_m','fp_d_m','heading_source','travel_bearing_deg','look_side'];
+  const r=S.caps.map(c=>[c.id,(c.imgName||c.id)+'.jpg',c.timestamp,c.project,c.lat,c.lon,c.altitude||'',c.accuracy||'',c.az,c.tilt,c.camH??'',c.fov,c.stage||'',c.fp?.w||'',c.fp?.d||'',c.headingSrc||'',c.travelBrg??'',c.lookSide||'']);
   return[h,...r].map(x=>x.join(',')).join('\n');
 }
 function buildFootprintsGJ(){
@@ -1222,11 +1297,13 @@ function buildFootprintsGJ(){
         kc_stage:c.stage,
         footprint_width_m:c.fp?.w||null,
         footprint_depth_m:c.fp?.d||null,
+        footprint_far_capped:c.fp?.farCapped??null,
+        travel_bearing_deg:c.travelBrg??null, look_rel_travel_deg:c.lookRel??null, look_side:c.lookSide??null,
         capture_lat:c.lat, capture_lon:c.lon,
       }
     }));
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.1.0',project:S.proj.name,
+    metadata:{app:'CropView L1',version:'3.2.0',project:S.proj.name,
       description:'FOV ground footprint polygons for all captures. Use for satellite pixel sampling in Layer 2.',
       exported:new Date().toISOString(),total:features.length},
     features};
