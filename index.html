@@ -328,7 +328,7 @@
   <div id="about-box">
     <div id="about-x" onclick="closeAboutDirect()">✕</div>
     <div class="alogo">CROP<span>VIEW</span></div>
-    <div class="aver">Version 3.2.0 · Layer 1 of 3 · 2026 · Camera Heading Fix</div>
+    <div class="aver">Version 3.2.1 · Layer 1 of 3 · 2026 · Camera Heading Fix</div>
 
     <div class="asec">
       <h4>👨‍🔬 Developed By</h4>
@@ -393,7 +393,7 @@
 
   <!-- HEADER -->
 <div id="header">
-  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.2.0</span><span class="proj" id="hproj">—</span></div>
+  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.2.1</span><span class="proj" id="hproj">—</span></div>
   <div id="hdr-right">
     <span id="cap-badge">0 cap</span>
     <div id="gps-btn" onclick="openGPS()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s">📡 GPS</div>
@@ -504,6 +504,7 @@
       <div class="dr"><span class="dl">Smoothed Samples</span><span class="dv" id="d-smp">—</span></div>
       <div class="dr"><span class="dl">Altitude</span><span class="dv" id="d-alt">—</span></div>
       <div class="dr"><span class="dl">Azimuth</span><span class="dv" id="d-az">—</span></div>
+      <div class="dr"><span class="dl">Sensors</span><span class="dv" id="d-sens">—</span></div>
       <div class="dr"><span class="dl">Camera Tilt (nadir)</span><span class="dv" id="d-tilt">—</span></div>
       <div class="dr"><span class="dl">Camera Height</span><span class="dv" id="d-camh">—</span></div>
       <div class="dr"><span class="dl">Est. H-FOV</span><span class="dv" id="d-fov">~65°</span></div>
@@ -566,7 +567,9 @@ const S = {
   prevFix:null,        // previous GPS fix, for bearing calc
   // ── compass stream health (v3) ──
   platform:null,          // 'ios' | 'other'
-  gotAbsolute:false,       // Android: has a *valid* deviceorientationabsolute reading arrived?
+  gotAbsolute:false,
+  platform:'unknown', sensorPerm:'unknown', compassStart:0, noSensorWarned:false,
+  oriCount:0, absCount:0,       // Android: has a *valid* deviceorientationabsolute reading arrived?
   lastValidOriTime:null,   // last time we accepted a usable heading
   lastAnyOriTime:null,     // last time an orientation event fired at all (valid or not)
   lastMotionTime:null,     // last devicemotion heartbeat — proves the sensor stack itself is alive
@@ -577,7 +580,7 @@ const S = {
   stage:null,
   caps:[],
   facing:'environment',stream:null,
-  map:null,umark:null,fovL:null,rayL:null,capL:null,fpL:null,
+  map:null,umark:null,fovL:null,rayL:null,coneL:null,capL:null,fpL:null,
   sat:false,tile:null,
   proj:{name:'',notes:'',t:''}
 };
@@ -693,7 +696,8 @@ function fuseHeading(){
     S.headingSrc = 'STALE·HOLD';
     S.signalState = 'STALE';
   } else {
-    S.headingSrc = 'SIGNAL LOST';
+    S.headingSrc = S.sensorPerm==='denied' ? 'SENSORS BLOCKED'
+                 : (!S.lastAnyOriTime ? 'NO SENSOR DATA' : 'SIGNAL LOST');
     S.signalState = 'LOST';
   }
 }
@@ -812,41 +816,52 @@ function startGPS(){
        recovering — trackAlphaChange(), watchdogTick(), resyncOrientation().
    applyHeading() is the single funnel every valid reading passes
    through; anything that doesn't validate never reaches it. */
+/* v3.2.1 — THE ROOT CAUSE OF "SIGNAL LOST" ON ANDROID.
+   Up to v3.2.0 the app decided "this is an iPhone" by checking whether
+   DeviceOrientationEvent.requestPermission exists. Only Safari had it —
+   until Chrome 151 (July 2026) shipped the same API on Android. From then
+   on every updated Android phone took the iOS branch, listened only for
+   Apple's webkitCompassHeading (which Android never sends), and dropped
+   every reading, tilt included: heading stuck at 0°, tilt stuck at its 45°
+   default, SIGNAL LOST, and in v3.1 the GPS travel direction silently took
+   over as the "camera" heading.
+   Now: ask for permission wherever the API exists (it must happen inside
+   the button tap), always attach every listener, and let each EVENT say
+   which platform it came from. */
+function requestSensorPermission(){
+  const asks = [];
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function')
+    asks.push(DeviceOrientationEvent.requestPermission().catch(()=> 'error'));
+  if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function')
+    asks.push(DeviceMotionEvent.requestPermission().catch(()=> 'error'));
+  if(!asks.length){ S.sensorPerm = 'n/a'; return Promise.resolve('n/a'); }
+  return Promise.all(asks).then(r=>{
+    S.sensorPerm = r.includes('denied') ? 'denied' : (r.includes('granted') ? 'granted' : 'unknown');
+    if(S.sensorPerm==='denied') toast('Motion sensors blocked — allow them in browser site settings','err');
+    return S.sensorPerm;
+  });
+}
 function startCompass(){
-  const iosPerm = typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function';
-  if(iosPerm){
-    S.platform = 'ios';
-    DeviceOrientationEvent.requestPermission()
-      .then(r=>{ if(r==='granted') window.addEventListener('deviceorientation', onOriIOS, true); })
-      .catch(()=>window.addEventListener('deviceorientation', onOriIOS, true));
-    if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
-      DeviceMotionEvent.requestPermission()
-        .then(r=>{ if(r==='granted') window.addEventListener('devicemotion', onMotion, true); })
-        .catch(()=>{});
-    } else {
-      window.addEventListener('devicemotion', onMotion, true);
-    }
-  } else {
-    S.platform = 'other';
-    attachOrientationListeners();
-    window.addEventListener('devicemotion', onMotion, true);
-  }
+  S.platform = 'unknown';          // set from the first real event (onOri)
+  S.compassStart = Date.now();
+  requestSensorPermission();       // called synchronously inside the tap
+  attachOrientationListeners();
+  window.addEventListener('devicemotion', onMotion, true);
   document.addEventListener('visibilitychange', onVisibilityChange);
   setInterval(watchdogTick, 1000);
   requestAnimationFrame(visualLoop);
 }
 
 function attachOrientationListeners(){
-  // Android/other: deviceorientationabsolute gives a true-north reference;
-  // deviceorientation is only used as a fallback while no VALID absolute
-  // reading has arrived (see onOriAbs — gotAbsolute is only latched on a
-  // reading that actually validates, not merely on the event firing).
+  // Android: deviceorientationabsolute gives a true-north reference.
+  // deviceorientation carries iOS's webkitCompassHeading, and on Android is
+  // used for tilt, and for heading only if it declares itself absolute.
   window.addEventListener('deviceorientationabsolute', onOriAbs, true);
-  window.addEventListener('deviceorientation', onOriRel, true);
+  window.addEventListener('deviceorientation', onOri, true);
 }
 function detachOrientationListeners(){
   window.removeEventListener('deviceorientationabsolute', onOriAbs, true);
-  window.removeEventListener('deviceorientation', onOriRel, true);
+  window.removeEventListener('deviceorientation', onOri, true);
 }
 
 function trackAlphaChange(raw){
@@ -869,6 +884,8 @@ function applyHeading(headingDeg){
 
 function onOriAbs(e){
   S.lastAnyOriTime = Date.now();
+  S.absCount = (S.absCount||0) + 1;
+  if(S.platform==='unknown') S.platform = 'android';
   if(e.alpha===null || e.alpha===undefined || isNaN(e.alpha)) return; // invalid — never treat as 0/North
   // Latch ONLY here, below the validation. Latching on the bare event (as v3.0
   // did) let a single alpha===null absolute event kill the relative fallback
@@ -879,30 +896,29 @@ function onOriAbs(e){
   applyTilt(e);
   applyHeading(cameraHeading(e.alpha, e.beta, e.gamma));
 }
-function onOriRel(e){
-  // Tilt (beta/gamma) is gravity-referenced, so it is valid from either stream.
-  applyTilt(e);
-  if(S.gotAbsolute) return; // a valid absolute stream is alive — ignore the relative one
+function onOri(e){
   S.lastAnyOriTime = Date.now();
+  S.oriCount = (S.oriCount||0) + 1;
+  applyTilt(e);                    // beta/gamma are gravity-referenced on every platform
+  const h = e.webkitCompassHeading;
+  if(typeof h === 'number' && !isNaN(h)){
+    // iOS Safari — already a compass heading, clockwise from north
+    S.platform = 'ios';
+    trackAlphaChange(h);
+    const acc = e.webkitCompassAccuracy; // degrees; -1 or large means "don't trust this"
+    S.lowConfidence = (typeof acc==='number') && (acc<0 || acc>40);
+    applyHeading(h);
+    return;
+  }
+  if(S.platform==='unknown' && e.beta!==null && e.beta!==undefined) S.platform = 'android';
+  if(S.gotAbsolute) return; // a valid absolute stream is alive — ignore this one for heading
   // Chrome/Android's plain 'deviceorientation' alpha is RELATIVE to an
-  // arbitrary start direction. Using it as a compass (v3.1 did, briefly,
-  // after every resync) gives a confident, meaningless heading.
+  // arbitrary start direction — never use it as a compass.
   if(e.absolute !== true) return;
   if(e.alpha===null || e.alpha===undefined || isNaN(e.alpha)) return;
   if(e.beta===null || e.gamma===null || isNaN(e.beta) || isNaN(e.gamma)) return;
   trackAlphaChange(e.alpha);
   applyHeading(cameraHeading(e.alpha, e.beta, e.gamma));
-}
-function onOriIOS(e){
-  S.lastAnyOriTime = Date.now();
-  const h = e.webkitCompassHeading;
-  if(h===undefined || h===null || isNaN(h)) return;
-  trackAlphaChange(h);
-  const acc = e.webkitCompassAccuracy; // degrees; -1 or a large value means "don't trust this"
-  S.lowConfidence = (typeof acc==='number') && (acc<0 || acc>40);
-  // iOS — already a true compass heading, clockwise from north
-  applyTilt(e);
-  applyHeading(h);
 }
 function onMotion(){ S.lastMotionTime = Date.now(); } // heartbeat only — proves the sensor stack is alive
 
@@ -918,18 +934,15 @@ function resyncOrientation(force){
   S.lastResyncTime = now;
   S.gotAbsolute = false;
   S.lastAlphaChangeTime = now;
-  if(S.platform==='ios'){
-    window.removeEventListener('deviceorientation', onOriIOS, true);
-    window.addEventListener('deviceorientation', onOriIOS, true);
-  } else {
-    detachOrientationListeners();
-    attachOrientationListeners();
-  }
+  detachOrientationListeners();
+  attachOrientationListeners();
 }
 
 function manualRecalibrate(){
-  resyncOrientation(true);
-  toast('Recalibrating — move the phone in a figure-8','ok');
+  requestSensorPermission().then(()=>{
+    resyncOrientation(true);
+    if(S.sensorPerm!=='denied') toast('Recalibrating — move the phone in a figure-8','ok');
+  });
 }
 
 /* Watchdog: runs every second regardless of whether any sensor event
@@ -945,6 +958,12 @@ function watchdogTick(){
   const stuck = S.lastAlphaChangeTime && (now-S.lastAlphaChangeTime) > STUCK_MS && sinceAnyOri < 3000;
   const deadStream = sinceValid > STALE_MS && sinceMotion < 3000;
   if(stuck || deadStream) resyncOrientation(false);
+  // Nothing at all 5 s after start: tell the user once, with the fix.
+  if(!S.lastAnyOriTime && !S.noSensorWarned && S.compassStart && now-S.compassStart > 5000){
+    S.noSensorWarned = true;
+    toast(S.sensorPerm==='denied' ? 'Motion sensors blocked — Chrome ⋮ › Settings › Site settings › Motion sensors'
+                                  : 'No compass data — tap the compass to retry','err');
+  }
   fuseHeading(); updHUD(); updData();
 }
 
@@ -1032,6 +1051,7 @@ function updData(){
   set('d-smp',S.gpsSamples>0?S.gpsSamples+' / '+GPS_BUF_MAX+' (drop-worst averaging)':null);
   set('d-alt',S.alt?S.alt.toFixed(1)+' m':null);
   set('d-az',Math.round(S.heading)+'° '+azLbl(S.heading)+'  ['+S.headingSrc+']');
+  set('d-sens',S.platform+' · perm '+S.sensorPerm+' · abs '+(S.absCount||0)+' · ori '+(S.oriCount||0));
   set('d-tilt',S.tilt+'° from nadir'+(S.tilt>90?' — above horizon':(S.tilt>=TILT_MAX?' — at horizon':'')));
   set('d-camh',S.camH.toFixed(2)+' m above ground');
   const fp=calcFP();
@@ -1110,28 +1130,39 @@ function updMapPos(){
   } else S.umark.setLatLng([S.lat,S.lon]);
   updFov();
 }
-/* Live cone. v3.1 destroyed and rebuilt the polygon every 120 ms and drew
-   it from the raw heading. Now the layers are created once and moved with
-   setLatLngs (cheap on low-end phones), drawn from the smoothed display
-   heading, skipped while the map tab is hidden, and a look-direction ray
-   is always shown — even when the camera is above the horizon — so you
-   can see where the phone is pointing before you capture. */
-const RAY_M = 40;
+/* Live view cone. The TRUE ground footprint at 1.5 m camera height is only
+   a few metres long — 1–3 px at street zoom, which is why "the cone we used
+   to have" seemed to vanish after v3.1 (v3.0's huge cone came from wrongly
+   using altitude above sea level). So the map now draws two things:
+     • a view cone — the camera's horizontal FOV wedge, a fixed ~90 px long
+       on screen at any zoom, so the look direction is always visible;
+     • the true footprint (dashed) — visible when you zoom in, and what is
+       actually exported.
+   Layers are created once and moved with setLatLngs; drawn from the smoothed
+   heading; colour = compass health (green OK · amber stale · red lost). */
+const CONE_PX = 90;
 function updFov(){
   if(!S.map || !S.lat || !S.lon) return;
   const mp = document.getElementById('map-panel');
   if(mp && !mp.classList.contains('active')) return;
   const h = S.dispAz;
   const col = S.signalState==='OK' ? '#4cff72' : (S.signalState==='STALE' ? '#ffb347' : '#ff5c5c');
-  const tip = turf.destination(turf.point([S.lon,S.lat]), RAY_M/1000, h).geometry.coordinates;
-  const ray = [[S.lat,S.lon],[tip[1],tip[0]]];
-  if(!S.rayL) S.rayL = L.polyline(ray,{color:col,weight:2,opacity:.9}).addTo(S.map);
+  const O = turf.point([S.lon,S.lat]);
+  const mpp = 156543.03392*Math.cos(S.lat*Math.PI/180)/Math.pow(2, S.map.getZoom());
+  const len = Math.max(CONE_PX*mpp, 3);                       // metres
+  const dest = (m,b)=>{ const c=turf.destination(O, m/1000, b).geometry.coordinates; return [c[1],c[0]]; };
+  const cone = [[S.lat,S.lon]];
+  for(let i=0;i<=10;i++) cone.push(dest(len, h - S.fov/2 + S.fov*i/10));
+  const ray = [[S.lat,S.lon], dest(len*1.15, h)];
+  if(!S.coneL) S.coneL = L.polygon(cone,{color:col,weight:1,fillColor:col,fillOpacity:.22,interactive:false}).addTo(S.map);
+  else { S.coneL.setLatLngs(cone); S.coneL.setStyle({color:col,fillColor:col}); }
+  if(!S.rayL) S.rayL = L.polyline(ray,{color:col,weight:2,opacity:.95,interactive:false}).addTo(S.map);
   else { S.rayL.setLatLngs(ray); S.rayL.setStyle({color:col}); }
   const c = calcPoly(h);
   if(!c){ if(S.fovL){ S.map.removeLayer(S.fovL); S.fovL=null; } return; }
   const ll = c.map(p=>[p[1],p[0]]);
-  if(!S.fovL) S.fovL = L.polygon(ll,{color:col,weight:1.5,fillColor:col,fillOpacity:.12,dashArray:'4 4'}).addTo(S.map);
-  else { S.fovL.setLatLngs(ll); S.fovL.setStyle({color:col,fillColor:col}); }
+  if(!S.fovL) S.fovL = L.polygon(ll,{color:'#ffffff',weight:1.5,fillColor:col,fillOpacity:.35,dashArray:'3 3',interactive:false}).addTo(S.map);
+  else { S.fovL.setLatLngs(ll); S.fovL.setStyle({fillColor:col}); }
 }
 function centerMe(){if(S.lat&&S.lon)S.map.setView([S.lat,S.lon],18);else toast('Waiting for GPS…','err');}
 function toggleSat(){
@@ -1265,7 +1296,7 @@ async function doZIP(){
 
 function buildGJ(){
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.2.0',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
+    metadata:{app:'CropView L1',version:'3.2.1',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
     features:S.caps.map(c=>({type:'Feature',
       geometry:{type:'Point',coordinates:[c.lon,c.lat,c.altitude||0]},
       properties:{id:c.id,imgName:(c.imgName||c.id)+'.jpg',timestamp:c.timestamp,project:c.project,
@@ -1303,7 +1334,7 @@ function buildFootprintsGJ(){
       }
     }));
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.2.0',project:S.proj.name,
+    metadata:{app:'CropView L1',version:'3.2.1',project:S.proj.name,
       description:'FOV ground footprint polygons for all captures. Use for satellite pixel sampling in Layer 2.',
       exported:new Date().toISOString(),total:features.length},
     features};
