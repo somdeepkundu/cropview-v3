@@ -5,27 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CropView v3 — Geo-Camera Field Capture</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0a0f0a" />
+  <meta name="theme-color" content="#080d1a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     :root {
-      --bg:#0a0f0a; --surface:#111a11; --surface2:#1a261a; --border:#2a3d2a;
-      --green:#4cff72; --green2:#1daa3f; --amber:#f5c842; --red:#ff4c4c;
-      --text:#d4e8d4; --muted:#6b8f6b;
-      --mono:'Space Mono',monospace; --sans:'DM Sans',sans-serif; --radius:12px;
+      /* v3.4 LTR — palette and type match the Data Explorer (cropview-viewer-v2).
+         Variable names are kept so no rule had to change: --green is now the
+         cyan accent. Live cone / compass / GPS-quality colours are set in the
+         script and are unchanged (green OK · amber stale · red lost). */
+      --bg:#080d1a; --surface:#0f1626; --surface2:#182035; --border:#253047;
+      --green:#22d3ee; --green2:#0ea5e9; --amber:#fbbf24; --red:#f87171;
+      --text:#e8f0fe; --muted:#94a3b8;
+      --mono:'Comfortaa',system-ui,sans-serif; --sans:'Comfortaa',system-ui,sans-serif; --radius:10px;
     }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-variant-numeric:tabular-nums;overflow:hidden}
 
     /* HEADER */
-    #header{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(10,15,10,.93);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+    #header{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(8,13,26,.93);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
     .logo{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--green)}
     .logo span{color:var(--muted);font-weight:400}
     .logo .proj{color:var(--amber);font-size:10px;display:block;margin-top:1px}
@@ -34,9 +38,9 @@
     #about-btn{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s}
     #about-btn:active{color:var(--green);border-color:var(--green2)}
     #status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:all .4s}
-    #status-dot.active{background:var(--green);box-shadow:0 0 0 4px rgba(76,255,114,.2);animation:pulse 2s infinite}
-    #status-dot.warn{background:var(--amber);box-shadow:0 0 0 4px rgba(245,200,66,.2)}
-    @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(76,255,114,.2)}50%{box-shadow:0 0 0 8px rgba(76,255,114,.05)}}
+    #status-dot.active{background:var(--green);box-shadow:0 0 0 4px rgba(34,211,238,.2);animation:pulse 2s infinite}
+    #status-dot.warn{background:var(--amber);box-shadow:0 0 0 4px rgba(251,191,36,.2)}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(34,211,238,.2)}50%{box-shadow:0 0 0 8px rgba(34,211,238,.05)}}
 
     /* TABS */
     #tabs{position:fixed;top:51px;left:0;right:0;z-index:999;display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
@@ -52,7 +56,7 @@
     #vcont{flex:1;position:relative;overflow:hidden;background:#000}
     #video{width:100%;height:100%;object-fit:cover}
     #fov-ol{position:absolute;inset:0;pointer-events:none}
-    .ch{position:absolute;background:rgba(76,255,114,.4)}
+    .ch{position:absolute;background:rgba(34,211,238,.4)}
     .ch-h{top:50%;left:25%;width:50%;height:1px;transform:translateY(-50%)}
     .ch-v{left:50%;top:25%;height:50%;width:1px;transform:translateX(-50%)}
     .ch-c{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;border:2px solid var(--green);border-radius:50%}
@@ -64,11 +68,11 @@
 
     /* TILT GUIDE */
     #tilt-guide{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:30px;display:flex;flex-direction:column;align-items:center;gap:4px}
-    #tilt-bar{position:relative;width:28px;height:130px;background:rgba(10,15,10,.7);border-radius:14px;border:1px solid rgba(42,61,42,.8);overflow:hidden}
-    #tilt-zone{position:absolute;left:0;right:0;background:rgba(76,255,114,.15);border-top:1px solid rgba(76,255,114,.5);border-bottom:1px solid rgba(76,255,114,.5)}
-    #tilt-pin{position:absolute;left:3px;right:3px;height:3px;background:var(--green);border-radius:2px;box-shadow:0 0 6px rgba(76,255,114,.7);transition:top .2s}
-    #tilt-pin.warn{background:var(--amber);box-shadow:0 0 6px rgba(245,200,66,.7)}
-    #tilt-deg{font-family:var(--mono);font-size:9px;color:var(--green);background:rgba(10,15,10,.75);padding:2px 4px;border-radius:4px}
+    #tilt-bar{position:relative;width:28px;height:130px;background:rgba(8,13,26,.7);border-radius:14px;border:1px solid rgba(37,48,71,.8);overflow:hidden}
+    #tilt-zone{position:absolute;left:0;right:0;background:rgba(34,211,238,.15);border-top:1px solid rgba(34,211,238,.5);border-bottom:1px solid rgba(34,211,238,.5)}
+    #tilt-pin{position:absolute;left:3px;right:3px;height:3px;background:var(--green);border-radius:2px;box-shadow:0 0 6px rgba(34,211,238,.7);transition:top .2s}
+    #tilt-pin.warn{background:var(--amber);box-shadow:0 0 6px rgba(251,191,36,.7)}
+    #tilt-deg{font-family:var(--mono);font-size:9px;color:var(--green);background:rgba(8,13,26,.75);padding:2px 4px;border-radius:4px}
     #tilt-deg.warn{color:var(--amber)}
     #tilt-lbl{font-family:var(--mono);font-size:8px;color:var(--muted);text-align:center;line-height:1.4}
 
@@ -82,7 +86,7 @@
 
     /* HUD */
     #hud{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:4px}
-    .hbadge{background:rgba(10,15,10,.75);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:10px;color:var(--green)}
+    .hbadge{background:rgba(8,13,26,.75);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:10px;color:var(--green)}
     .hbadge.warn{color:var(--amber);border-color:var(--amber)}
     .hbadge.bad{color:var(--red);border-color:var(--red)}
     .hbadge.dim{color:var(--muted)}
@@ -94,7 +98,7 @@
     .bp:active{transform:scale(.97);background:var(--green2)}
     .bs{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
     .bs:active{transform:scale(.97)}
-    .bd{background:rgba(255,76,76,.15);color:var(--red);border:1px solid rgba(255,76,76,.3)}
+    .bd{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.3)}
 
     /* MAP */
     #map{flex:1}
@@ -106,14 +110,14 @@
     #data-panel{overflow-y:auto;padding:14px;gap:10px}
     .dc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px}
     .dc h3{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
-    .dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(42,61,42,.5);font-size:13px}
+    .dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(37,48,71,.5);font-size:13px}
     .dr:last-child{border-bottom:none}
     .dl{color:var(--muted);font-size:12px}
     .dv{font-family:var(--mono);font-size:12px;color:var(--green)}
     .dv.na{color:var(--muted)}
     .kc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
     .kcs{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s}
-    .kcs.on{border-color:var(--green);background:rgba(76,255,114,.08)}
+    .kcs.on{border-color:var(--green);background:rgba(34,211,238,.08)}
     .kcs .sn{font-family:var(--mono);font-size:18px;color:var(--green);font-weight:700}
     .kcs .sl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
     .kcs .sv{font-family:var(--mono);font-size:11px;color:var(--amber);margin-top:4px}
@@ -161,7 +165,7 @@
     .asec a{color:var(--green);text-decoration:none}
     .atag{display:inline-block;font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);color:var(--muted);margin:3px 3px 0 0}
     .atag.h{border-color:var(--green2);color:var(--green)}
-    .discbox{background:rgba(245,200,66,.06);border:1px solid rgba(245,200,66,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--amber);line-height:1.6;margin-top:8px}
+    .discbox{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--amber);line-height:1.6;margin-top:8px}
 
     /* GPS STATUS MODAL */
     #gps-ov{display:none;position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px}
@@ -174,9 +178,9 @@
     .ring-track{fill:none;stroke:var(--surface2);stroke-width:10}
     .ring-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .6s,stroke .4s}
     #fix-badge{margin-top:10px;font-family:var(--mono);font-size:12px;font-weight:700;padding:5px 16px;border-radius:20px;letter-spacing:.5px;border:2px solid var(--muted);color:var(--muted)}
-    #fix-badge.good{border-color:var(--green);color:var(--green);background:rgba(76,255,114,.08)}
-    #fix-badge.ok{border-color:var(--amber);color:var(--amber);background:rgba(245,200,66,.08)}
-    #fix-badge.poor{border-color:var(--red);color:var(--red);background:rgba(255,76,76,.08)}
+    #fix-badge.good{border-color:var(--green);color:var(--green);background:rgba(34,211,238,.08)}
+    #fix-badge.ok{border-color:var(--amber);color:var(--amber);background:rgba(251,191,36,.08)}
+    #fix-badge.poor{border-color:var(--red);color:var(--red);background:rgba(248,113,113,.08)}
     .sat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
     .sat-bar{display:flex;flex-direction:column;align-items:center;gap:3px}
     .sat-bar-inner{width:100%;height:36px;background:var(--surface2);border-radius:4px;position:relative;overflow:hidden;border:1px solid var(--border)}
@@ -186,7 +190,7 @@
     .acc-bar{flex:1;border-radius:2px;background:var(--green2);transition:height .3s,background .3s}
     .gsec{margin-bottom:14px}
     .gsec h4{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
-    .grow{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,61,42,.4);font-size:12px}
+    .grow{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(37,48,71,.4);font-size:12px}
     .grow:last-child{border-bottom:none}
     .gl{color:var(--muted);font-size:11px}
     .gv{font-family:var(--mono);font-size:11px;color:var(--green)}
@@ -255,13 +259,13 @@
         <circle class="ring-track" cx="65" cy="65" r="52"/>
         <circle id="ring-fill" class="ring-fill" cx="65" cy="65" r="52"
           stroke-dasharray="327" stroke-dashoffset="327"
-          stroke="#4cff72" transform="rotate(-90 65 65)"/>
+          stroke="#22d3ee" transform="rotate(-90 65 65)"/>
         <text id="ring-acc-val" x="65" y="60" text-anchor="middle"
-          font-family="Space Mono,monospace" font-size="22" font-weight="700" fill="#d4e8d4">—</text>
+          font-family="Comfortaa,sans-serif" font-size="22" font-weight="700" fill="#e8f0fe">—</text>
         <text x="65" y="78" text-anchor="middle"
-          font-family="Space Mono,monospace" font-size="11" fill="#6b8f6b">metres</text>
+          font-family="Comfortaa,sans-serif" font-size="11" fill="#94a3b8">metres</text>
         <text x="65" y="94" text-anchor="middle"
-          font-family="Space Mono,monospace" font-size="9" fill="#6b8f6b">accuracy radius</text>
+          font-family="Comfortaa,sans-serif" font-size="9" fill="#94a3b8">accuracy radius</text>
       </svg>
       <div id="fix-badge">NO FIX</div>
     </div>
@@ -271,11 +275,11 @@
       <h4>🛰 Estimated Constellation Activity</h4>
       <div class="sat-grid">
         <div class="sat-bar">
-          <div class="sat-bar-inner"><div class="sat-bar-fill" id="bar-gps" style="background:#4cff72;height:0%"></div></div>
+          <div class="sat-bar-inner"><div class="sat-bar-fill" id="bar-gps" style="background:#22d3ee;height:0%"></div></div>
           <div class="sat-bar-lbl">GPS</div>
         </div>
         <div class="sat-bar">
-          <div class="sat-bar-inner"><div class="sat-bar-fill" id="bar-glo" style="background:#f5c842;height:0%"></div></div>
+          <div class="sat-bar-inner"><div class="sat-bar-fill" id="bar-glo" style="background:#fbbf24;height:0%"></div></div>
           <div class="sat-bar-lbl">GLONASS</div>
         </div>
         <div class="sat-bar">
@@ -328,7 +332,7 @@
   <div id="about-box">
     <div id="about-x" onclick="closeAboutDirect()">✕</div>
     <div class="alogo">CROP<span>VIEW</span></div>
-    <div class="aver">Version 3.2.1 · Layer 1 of 3 · 2026 · Camera Heading Fix</div>
+    <div class="aver">Version 3.4 LTR · Layer 1 of 3 · 2026 · Long-term release</div>
 
     <div class="asec">
       <h4>👨‍🔬 Developed By</h4>
@@ -362,7 +366,7 @@
     <div class="asec">
       <h4>🧭 What's new in v3</h4>
       <p>The heading pipeline no longer trusts a single browser event. It watches its own sensor stream, throws out invalid readings instead of quietly defaulting to North, notices when a phone-specific bug freezes the compass, and silently resubscribes and recovers. If it truly can't get a fix, it says so instead of showing you a confident, wrong cone. Tap the compass any time to force a recalibration.</p>
-      <p><b>v3.2:</b> the heading is now always where the <i>camera</i> points, never the direction you are travelling — so side-looking shots from a vehicle are recorded correctly, and the map cone follows the phone live, even when held upright.</p>
+      <p><b>Since v3.2:</b> the heading is now always where the <i>camera</i> points, never the direction you are travelling — so side-looking shots from a vehicle are recorded correctly, and the map cone follows the phone live, even when held upright.</p>
     </div>
 
     <div class="asec">
@@ -393,7 +397,7 @@
 
   <!-- HEADER -->
 <div id="header">
-  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.2.1</span><span class="proj" id="hproj">—</span></div>
+  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.4 LTR</span><span class="proj" id="hproj">—</span></div>
   <div id="hdr-right">
     <span id="cap-badge">0 cap</span>
     <div id="gps-btn" onclick="openGPS()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s">📡 GPS</div>
@@ -438,23 +442,23 @@
            Tap to force a resync — see manualRecalibrate() below. -->
       <div id="compass" onclick="manualRecalibrate()" title="Tap to recalibrate">
         <svg viewBox="0 0 60 60">
-          <circle id="compass-ring" cx="30" cy="30" r="28" fill="rgba(10,15,10,.7)" stroke="#2a3d2a" stroke-width="1.5"/>
+          <circle id="compass-ring" cx="30" cy="30" r="28" fill="rgba(8,13,26,.7)" stroke="#253047" stroke-width="1.5"/>
           <!-- ROTATING ROSE — spins so current heading faces the fixed pointer -->
           <g id="crose" style="transform-origin:30px 30px">
-            <text x="30" y="11" text-anchor="middle" font-family="Space Mono" font-size="7" fill="#4cff72">N</text>
-            <text x="30" y="54" text-anchor="middle" font-family="Space Mono" font-size="7" fill="#6b8f6b">S</text>
-            <text x="6"  y="33" text-anchor="middle" font-family="Space Mono" font-size="7" fill="#6b8f6b">W</text>
-            <text x="54" y="33" text-anchor="middle" font-family="Space Mono" font-size="7" fill="#4cff72">E</text>
+            <text x="30" y="11" text-anchor="middle" font-family="Comfortaa,sans-serif" font-size="7" fill="#22d3ee">N</text>
+            <text x="30" y="54" text-anchor="middle" font-family="Comfortaa,sans-serif" font-size="7" fill="#94a3b8">S</text>
+            <text x="6"  y="33" text-anchor="middle" font-family="Comfortaa,sans-serif" font-size="7" fill="#94a3b8">W</text>
+            <text x="54" y="33" text-anchor="middle" font-family="Comfortaa,sans-serif" font-size="7" fill="#22d3ee">E</text>
             <!-- tick marks -->
-            <line x1="30" y1="4" x2="30" y2="8" stroke="#4cff72" stroke-width="1.5"/>
-            <line x1="30" y1="52" x2="30" y2="56" stroke="#6b8f6b" stroke-width="1"/>
-            <line x1="4" y1="30" x2="8" y2="30" stroke="#6b8f6b" stroke-width="1"/>
-            <line x1="52" y1="30" x2="56" y2="30" stroke="#6b8f6b" stroke-width="1"/>
+            <line x1="30" y1="4" x2="30" y2="8" stroke="#22d3ee" stroke-width="1.5"/>
+            <line x1="30" y1="52" x2="30" y2="56" stroke="#94a3b8" stroke-width="1"/>
+            <line x1="4" y1="30" x2="8" y2="30" stroke="#94a3b8" stroke-width="1"/>
+            <line x1="52" y1="30" x2="56" y2="30" stroke="#94a3b8" stroke-width="1"/>
           </g>
           <!-- FIXED heading pointer — always at top, shows direction you're facing -->
-          <polygon points="30,13 27,24 30,21 33,24" fill="#4cff72" opacity=".95"/>
-          <polygon points="30,47 27,36 30,39 33,36" fill="#3d5c3d" opacity=".7"/>
-          <circle cx="30" cy="30" r="2.5" fill="#4cff72" opacity=".8"/>
+          <polygon points="30,13 27,24 30,21 33,24" fill="#22d3ee" opacity=".95"/>
+          <polygon points="30,47 27,36 30,39 33,36" fill="#475569" opacity=".7"/>
+          <circle cx="30" cy="30" r="2.5" fill="#22d3ee" opacity=".8"/>
         </svg>
         <div id="compass-tap">TAP TO RECAL</div>
       </div>
@@ -1296,7 +1300,7 @@ async function doZIP(){
 
 function buildGJ(){
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.2.1',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
+    metadata:{app:'CropView L1',version:'3.4.0',release:'LTR',project:S.proj.name,notes:S.proj.notes,exported:new Date().toISOString(),captures:S.caps.length},
     features:S.caps.map(c=>({type:'Feature',
       geometry:{type:'Point',coordinates:[c.lon,c.lat,c.altitude||0]},
       properties:{id:c.id,imgName:(c.imgName||c.id)+'.jpg',timestamp:c.timestamp,project:c.project,
@@ -1334,7 +1338,7 @@ function buildFootprintsGJ(){
       }
     }));
   return{type:'FeatureCollection',
-    metadata:{app:'CropView L1',version:'3.2.1',project:S.proj.name,
+    metadata:{app:'CropView L1',version:'3.4.0',release:'LTR',project:S.proj.name,
       description:'FOV ground footprint polygons for all captures. Use for satellite pixel sampling in Layer 2.',
       exported:new Date().toISOString(),total:features.length},
     features};
