@@ -274,6 +274,27 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
   .an-left{width:100%;min-width:100%;max-height:40vh}
   .logo-tx small{display:none}
 }
+
+/* full-width bottom colour legend */
+#col-legend{position:absolute;left:12px;right:12px;bottom:22px;z-index:800;display:flex;align-items:center;gap:18px;
+  padding:10px 18px 8px;border-radius:12px;border:1px solid var(--bdr);box-shadow:var(--shadow);
+  background:color-mix(in srgb,var(--surf) 82%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:var(--txt);font-size:.68rem;pointer-events:auto}
+#col-legend .cl-title{flex-shrink:0;font-weight:800;font-size:.72rem;color:var(--txt);display:flex;flex-direction:column;line-height:1.25;min-width:84px}
+#col-legend .cl-title small{font-weight:500;font-size:.62rem;color:var(--txt3)}
+#col-legend .cl-scale{flex:1;min-width:0;padding-bottom:2px}
+#col-legend .cl-bar{height:9px;border-radius:5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+#col-legend .cl-ticks{position:relative;height:18px;margin-top:2px}
+#col-legend .cl-tick{position:absolute;top:0;padding-top:6px;white-space:nowrap;color:var(--txt2);font-variant-numeric:tabular-nums}
+#col-legend .cl-tick b{position:absolute;top:0;left:50%;width:1px;height:5px;background:var(--txt3)}
+#col-legend .cl-tick[style*="left:0%"] b{left:0}
+#col-legend .cl-tick[style*="left:100%"] b{left:auto;right:0}
+#col-legend .cl-tick.end{color:var(--txt);font-weight:700}
+#col-legend .cl-chips{flex:1;display:flex;flex-wrap:wrap;gap:6px 14px;max-height:62px;overflow:auto}
+#col-legend .cl-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#col-legend .cl-chip i{width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;flex-shrink:0}
+#col-legend .cl-chip em{font-style:normal;color:var(--txt3)}
+@media(max-width:600px){#col-legend{left:6px;right:6px;gap:10px;padding:8px 12px 6px}#col-legend .cl-title{min-width:0}}
 </style>
 </head>
 <body>
@@ -376,6 +397,8 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
             <label class="sw"><input type="checkbox" id="tog-arr" onchange="redraw()"/><span class="sl"></span></label></div>
           <div class="tog-row"><span class="tl">Computed FOV cone</span>
             <label class="sw"><input type="checkbox" id="tog-cone" onchange="redraw()"/><span class="sl"></span></label></div>
+          <div class="tog-row"><span class="tl" title="When a point is clicked, show its arrow and cone and hide every other point's">Only show clicked point's arrow &amp; cone</span>
+            <label class="sw"><input type="checkbox" id="tog-solo" onchange="redraw()"/><span class="sl"></span></label></div>
           <div class="tog-row"><span class="tl">Capture path</span>
             <label class="sw"><input type="checkbox" id="tog-path" checked onchange="redraw()"/><span class="sl"></span></label></div>
           <div class="range-row">
@@ -383,6 +406,12 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
             <input type="range" id="sl-len" min="30" max="800" value="150"
               oninput="arrowLen=+this.value;document.getElementById('sl-len-v').textContent=this.value+'m';redraw()"/>
             <span class="rv" id="sl-len-v">150m</span>
+          </div>
+          <div class="range-row">
+            <span class="rl">Arrow head</span>
+            <input type="range" id="sl-head" min="5" max="60" value="20"
+              oninput="arrowHead=+this.value/100;document.getElementById('sl-head-v').textContent=this.value+'%';redraw()"/>
+            <span class="rv" id="sl-head-v">20%</span>
           </div>
           <div style="margin-bottom:4px">
             <div style="font-size:.73rem;color:var(--txt2);margin-bottom:5px">Colour by</div>
@@ -535,6 +564,8 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
 </div>
 
 <script>
+/* internal changelog v2.1: colour legend on map; arrow-head size slider;
+   overlapping points fanned out (auto spread per zoom); lightbox nav direction reversed. */
 // ═══════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════
@@ -547,7 +578,7 @@ const PALETTE = ['#22d3ee','#f59e0b','#a78bfa','#34d399','#f87171','#818cf8','#f
 const CARTO_URL  = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_3oql_1_644968c9b34d6aa6ff5f421f';
 const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>';
 
-let rotOffset = 0, rotDir = 'ccw', arrowLen = 150;
+let rotOffset = 0, rotDir = 'ccw', arrowLen = 150, arrowHead = .2;
 let isDark = true, mapReady = false;
 let theMap,gFP,gArrow,gCone,gPath,gPts;
 let imgBlobs = {}, imgB64s = {};
@@ -676,6 +707,7 @@ function resetApp(){
   document.getElementById('cust-in').value='';
   document.getElementById('sl-len').value=150;
   document.getElementById('sl-len-v').textContent='150m';
+  arrowHead=.2; document.getElementById('sl-head').value=20; document.getElementById('sl-head-v').textContent='20%';
   const up=document.getElementById('sec-upload');
   toggleSection(up,false);
   const bdg=up.querySelector('.badge-mini'); if(bdg) bdg.remove();
@@ -871,6 +903,7 @@ function initMap(){
     L.control.layers({'🗺️ Voyager':voyager,'🛰️ Satellite':esriSat},null,{position:'topleft',collapsed:true}).addTo(theMap);
     gFP=L.layerGroup().addTo(theMap); gCone=L.layerGroup().addTo(theMap);
     gArrow=L.layerGroup().addTo(theMap); gPath=L.layerGroup().addTo(theMap); gPts=L.layerGroup().addTo(theMap);
+    theMap.on('zoomend',()=>redraw());
     mapReady=true;
   } else if(captures.length){
     const ac=activeCaps();
@@ -912,32 +945,118 @@ function redraw(){
   const showArr=document.getElementById('tog-arr').checked;
   const showCone=document.getElementById('tog-cone').checked;
   const showPath=document.getElementById('tog-path').checked;
+  const solo=document.getElementById('tog-solo').checked && !!selectedCapture;
   gFP.clearLayers(); gArrow.clearLayers(); gCone.clearLayers(); gPath.clearLayers(); gPts.clearLayers();
   const list = activeCaps();
   if(showPath && list.length>1) L.polyline(list.map(c=>[c.lat,c.lon]),{color:'#334155',weight:2,dashArray:'7 5',opacity:.65}).addTo(gPath);
 
+  const spreadPos = computeSpread(list);
   list.forEach((c,i)=>{
     const col=getColor(c), eaz=effectiveAz(c.azimuth), rotAngle=rotDir==='ccw'?-rotOffset:rotOffset;
-    if(showFP && c.fovPolyOrig){
+    const isSelC = selectedCapture && selectedCapture.uid===c.uid;
+    // Solo mode: only the clicked point gets overlays (arrow + cone always on for it)
+    const drawFP   = solo ? (isSelC && showFP) : showFP;
+    const drawCone = solo ? isSelC : showCone;
+    const drawArr  = solo ? isSelC : showArr;
+    if(drawFP && c.fovPolyOrig){
       L.polygon(rotatePoly(c.fovPolyOrig,c.lat,c.lon,rotAngle),{color:col,fillColor:col,fillOpacity:.12,weight:1.5,opacity:.6}).addTo(gFP);
     }
-    if(showCone){
+    if(drawCone){
       const half=c.hfov/2, pts=[[c.lat,c.lon]];
       for(let s=0;s<=24;s++) pts.push(destPt(c.lat,c.lon,eaz-half+(c.hfov*s/24),arrowLen*1.5));
       pts.push([c.lat,c.lon]);
       L.polygon(pts,{color:col,fillColor:col,fillOpacity:.13,weight:1,opacity:.5,dashArray:'4 3'}).addTo(gCone);
     }
-    if(showArr){
+    if(drawArr){
       const tip=destPt(c.lat,c.lon,eaz,arrowLen);
       L.polyline([[c.lat,c.lon],tip],{color:col,weight:2.5,opacity:.9}).addTo(gArrow);
-      const lh=destPt(tip[0],tip[1],eaz+150,arrowLen*.2), rh=destPt(tip[0],tip[1],eaz-150,arrowLen*.2);
+      const lh=destPt(tip[0],tip[1],eaz+150,arrowLen*arrowHead), rh=destPt(tip[0],tip[1],eaz-150,arrowLen*arrowHead);
       L.polygon([tip,lh,rh],{color:col,fillColor:col,fillOpacity:1,weight:0}).addTo(gArrow);
     }
     const isSel = selectedCapture && selectedCapture.uid===c.uid;
-    const mk=L.circleMarker([c.lat,c.lon],{radius:isSel?13:8,color:'#fff',weight:isSel?3:2,fillColor:col,fillOpacity:.95}).addTo(gPts);
+    const pos = spreadPos[c.uid] || [c.lat,c.lon];
+    if(spreadPos[c.uid]) L.polyline([[c.lat,c.lon],pos],{color:col,weight:1,opacity:.7}).addTo(gPts);
+    const mk=L.circleMarker(pos,{radius:isSel?13:8,color:'#fff',weight:isSel?3:2,fillColor:col,fillOpacity:.95}).addTo(gPts);
     mk.bindPopup(popupHTML(c),{maxWidth:280,minWidth:260});
     mk.on('click',()=>openViewer(c));
   });
+  updateColorLegend(list);
+}
+// Fan out points that overlap on screen (within ~14px) into a small ring,
+// with a leader line back to the true GPS position. Recomputed on zoom.
+function computeSpread(list){
+  const out={}, TH=14, groups=[];
+  list.forEach(c=>{
+    const pt=theMap.latLngToLayerPoint([c.lat,c.lon]);
+    let g=groups.find(g=>Math.abs(g.x-pt.x)<TH&&Math.abs(g.y-pt.y)<TH);
+    if(!g){ g={x:pt.x,y:pt.y,items:[]}; groups.push(g); }
+    g.items.push(c);
+  });
+  groups.forEach(g=>{
+    const n=g.items.length; if(n<2) return;
+    const r=Math.max(18, n*20/(2*Math.PI)*1.1);
+    g.items.forEach((c,k)=>{
+      const a=2*Math.PI*k/n - Math.PI/2;
+      const ll=theMap.layerPointToLatLng(L.point(g.x+r*Math.cos(a), g.y+r*Math.sin(a)));
+      out[c.uid]=[ll.lat,ll.lng];
+    });
+  });
+  return out;
+}
+let colorLegendEl=null;
+// "Nice" tick values (1-2-5 steps) inside [mn,mx]
+function niceTicks(mn,mx,count,intOnly){
+  const span=mx-mn; if(span<=0) return [mn];
+  let step=Math.pow(10,Math.floor(Math.log10(span/count)));
+  const err=(span/count)/step;
+  if(err>=7.5) step*=10; else if(err>=3.5) step*=5; else if(err>=1.5) step*=2;
+  if(intOnly) step=Math.max(1,Math.round(step));
+  const out=[]; for(let v=Math.ceil(mn/step)*step; v<=mx+step*1e-9; v+=step) out.push(+v.toFixed(10));
+  return out;
+}
+function updateColorLegend(list){
+  if(!colorLegendEl){
+    colorLegendEl=L.DomUtil.create('div','',theMap.getContainer());
+    colorLegendEl.id='col-legend';
+    L.DomEvent.disableClickPropagation(colorLegendEl); L.DomEvent.disableScrollPropagation(colorLegendEl);
+    theMap.on('resize',()=>updateColorLegend(activeCaps()));
+  }
+  const el=colorLegendEl;
+  if(!list.length){ el.style.display='none'; return; } el.style.display='flex';
+  const mode=document.getElementById('sel-col').value;
+  const title={batch:'Project / Set',azimuth:'Azimuth',tilt:'Tilt',altitude:'Altitude',index:'Capture order'}[mode];
+  let body='';
+  if(mode==='batch'){
+    const projs=[...new Set(list.map(c=>c.project))];
+    body=`<div class="cl-chips">`+projs.map(p=>`<span class="cl-chip"><i style="background:${colorFor(p)}"></i>${p}<em>${list.filter(c=>c.project===p).length}</em></span>`).join('')+`</div>`;
+  } else {
+    const vals=list.map((x,i)=>mode==='azimuth'?x.azimuth:mode==='tilt'?x.tilt:mode==='altitude'?+x.alt:i+1);
+    const mn=Math.min(...vals), mx=Math.max(...vals);
+    const u=mode==='altitude'?' m':mode==='index'?'':'°';
+    const dec=mode==='altitude'?1:0;
+    const f=v=>(+v).toFixed(dec)+u;
+    const stops=[]; for(let t=0;t<=1.0001;t+=.1) stops.push(`hsl(${240-240*t},80%,55%) ${(t*100).toFixed(0)}%`);
+    const prevScale=el.querySelector('.cl-scale');
+    const barW=Math.max(120,prevScale&&prevScale.clientWidth ? prevScale.clientWidth : (el.clientWidth||600)-140);
+    const target=Math.max(4,Math.min(12,Math.floor(barW/60)));
+    let ticks=[];
+    if(mx===mn){ ticks=[{v:mn,p:50}]; }
+    else{
+      const minGap=(48/barW)*100; // % needed between labels
+      ticks.push({v:mn,p:0,end:true});
+      niceTicks(mn,mx,target,mode==='index').forEach(v=>{
+        const p=(v-mn)/(mx-mn)*100;
+        if(p>minGap && p<100-minGap) ticks.push({v,p});
+      });
+      ticks.push({v:mx,p:100,end:true});
+    }
+    const tk=ticks.map((t,i)=>{
+      const align=t.p===0?'translateX(0)':t.p===100?'translateX(-100%)':'translateX(-50%)';
+      return `<span class="cl-tick${t.end?' end':''}" style="left:${t.p}%;transform:${align}"><b></b>${f(t.v)}</span>`;
+    }).join('');
+    body=`<div class="cl-scale"><div class="cl-bar" style="background:linear-gradient(90deg,${stops.join(',')})"></div><div class="cl-ticks">${tk}</div></div>`;
+  }
+  el.innerHTML=`<div class="cl-title">${title}<small>${list.length} pts</small></div>${body}`;
 }
 function popupHTML(c){
   const im = c.imgUrl ? `<div class="pop-img-wrap"><img src="${c.imgUrl}"/></div>` : `<div class="pop-img-wrap"><span class="no-img">No image</span></div>`;
@@ -1308,6 +1427,7 @@ function updateLBMini(c){
 }
 function navLightbox(dir){
   if(lbList.length<=1) return;
+  dir=-dir; // list is newest-first: → should step to the next (older→newer order the user expects)
   lbIndex = (lbIndex+dir+lbList.length)%lbList.length;
   renderLightbox();
 }
