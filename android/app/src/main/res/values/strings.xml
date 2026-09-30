@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CropView</string>
+    <string name="title_activity_main">CropView</string>
+    <string name="package_name">in.ac.iitb.ctara.cropview</string>
+    <string name="custom_url_scheme">in.ac.iitb.ctara.cropview</string>
+</resources>

@@ -1,0 +1,8 @@
+{
+  "appId": "in.ac.iitb.ctara.cropview",
+  "appName": "CropView",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
