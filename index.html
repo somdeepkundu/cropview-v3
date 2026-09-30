@@ -1351,8 +1351,17 @@ function doClear(){if(!S.caps.length)return;if(!confirm('Clear all '+S.caps.leng
 
 /* ── PERSIST ── */
 function saveCaps(){
-  try{localStorage.setItem('cv_caps',JSON.stringify(S.caps.map(c=>({...c,full:null}))));
-      localStorage.setItem('cv_proj',JSON.stringify(S.proj));}catch(e){}
+  // cv_caps holds every project's captures. Replace only this project's records so
+  // opening project B no longer wipes project A (bug up to v3.4 LTR build 1).
+  try{
+    let all=[]; try{ all=JSON.parse(localStorage.getItem('cv_caps')||'[]'); }catch(e){}
+    const others=all.filter(c=>c.project!==S.proj.name);
+    localStorage.setItem('cv_caps',JSON.stringify(others.concat(S.caps.map(c=>({...c,full:null})))));
+    localStorage.setItem('cv_proj',JSON.stringify(S.proj));
+  }catch(e){
+    console.error('saveCaps failed',e);
+    toast('Storage full — export a ZIP now to keep your captures','err');
+  }
 }
 function loadCaps(){
   try{
