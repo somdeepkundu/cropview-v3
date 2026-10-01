@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>CropView — Privacy Policy</title>
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{--bg:#080d1a;--surface:#0f1626;--border:#253047;--text:#e2e8f0;--muted:#94a3b8;--accent:#22d3ee;--accent2:#0ea5e9}
+  @media (prefers-color-scheme: light){:root{--bg:#f8fafc;--surface:#ffffff;--border:#e2e8f0;--text:#0f172a;--muted:#475569;--accent:#0891b2;--accent2:#0369a1}}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text)}
+  body{font:16px/1.65 Comfortaa,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+  main{max-width:760px;margin:0 auto;padding:40px 20px 64px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+  header img{width:56px;height:56px;border-radius:14px}
+  h1{font-size:1.7rem;margin:0;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .meta{color:var(--muted);font-size:.9rem;margin:4px 0 28px}
+  h2{font-size:1.1rem;color:var(--accent);margin:32px 0 8px}
+  p,li{color:var(--text)}
+  ul{padding-left:1.2rem}
+  li{margin:6px 0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:18px 0}
+  .card strong{color:var(--accent)}
+  a{color:var(--accent)}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon-192.png" alt="CropView icon" />
+    <h1>CropView Privacy Policy</h1>
+  </header>
+  <p class="meta">Effective date: 1 October 2026 · Applies to the CropView Android app and the CropView web app</p>
+
+  <div class="card">
+    <strong>In short:</strong> CropView has no accounts, no analytics, no ads and no servers of its own.
+    Your photos and their GPS and compass data are stored only on your device. They leave your device
+    only when you choose to export or share them.
+  </div>
+
+  <h2>Who we are</h2>
+  <p>CropView is a field data-collection tool for geo-tagged crop photography, developed by
+  Somdeep Kundu at RuDRA Lab, C-TARA, IIT Bombay, for agricultural research and field surveys.</p>
+
+  <h2>What the app uses, and why</h2>
+  <ul>
+    <li><strong>Camera</strong>: to take the crop photos you capture.</li>
+    <li><strong>Precise location (GPS)</strong>: to record where each photo was taken, its altitude and
+      accuracy, and to show your position on the map.</li>
+    <li><strong>Motion and orientation sensors</strong> (compass, tilt): to record which direction the camera
+      was facing and to estimate the ground area shown in each photo.</li>
+    <li><strong>Information you type</strong>: project name, notes, camera height and crop stage.</li>
+  </ul>
+  <p>Location and sensors are used only while the app is open on screen. CropView does not track you in the background.</p>
+
+  <h2>Where your data is stored</h2>
+  <p>Photos and their metadata (time, coordinates, heading, tilt, footprint and the details you entered) are saved in
+  the app's private storage on your device. We do not receive, upload or keep a copy of any of it.
+  Uninstalling the app, or clearing its storage, permanently deletes this data, so export anything you want to keep first.</p>
+
+  <h2>When data leaves your device</h2>
+  <ul>
+    <li><strong>Exports you start.</strong> When you save a photo or export a ZIP, GeoJSON or CSV file, the Android share
+      sheet opens and you choose where it goes (for example Google Drive, email, WhatsApp or your files). That
+      destination's own privacy policy then applies.</li>
+    <li><strong>Map backgrounds.</strong> When you are online, the map loads background tiles from
+      <a href="https://www.openstreetmap.org/" rel="noopener">OpenStreetMap</a> and
+      <a href="https://www.esri.com/" rel="noopener">Esri</a> (satellite imagery). As with any map, these services
+      receive your device's IP address and which map area is being displayed, which is usually near where you are.
+      No photos, project names or other CropView data are sent to them. Capture works fully offline; only the map
+      background needs a connection.</li>
+    <li><strong>Data Explorer link.</strong> The "Data Explorer" button opens a separate CropView web page in your
+      browser. It does not send your captures anywhere; you load exported files into it yourself.</li>
+  </ul>
+
+  <h2>What we do not do</h2>
+  <ul>
+    <li>We do not collect, sell or share personal information.</li>
+    <li>We do not use analytics, advertising or tracking tools.</li>
+    <li>We do not require an account, name, email address or phone number.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>You can deny or withdraw Camera or Location permission at any time in Android Settings → Apps → CropView →
+      Permissions. Capturing photos needs both.</li>
+    <li>You can delete individual captures or a whole project inside the app, or remove everything by uninstalling it.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>CropView is a research and field-survey tool and is not directed at children under 13.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If CropView starts handling data differently, this page will be updated and the effective date changed.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy: <a href="mailto:papaisomdeepkundu@gmail.com">papaisomdeepkundu@gmail.com</a>, or open an issue at
+  <a href="https://github.com/somdeepkundu/cropview-v3/issues" rel="noopener">github.com/somdeepkundu/cropview-v3</a>.</p>
+
+  <footer>CropView · Somdeep Kundu, RuDRA Lab, C-TARA, IIT Bombay</footer>
+</main>
+</body>
+</html>
