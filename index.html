@@ -209,6 +209,152 @@
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
   </style>
+  <!-- ═══ v3.6 GLASS LAYER ═══════════════════════════════════════════════
+       Everything that makes the v3.6 look lives in this one block, on top of
+       the unchanged v3.4 rules above. Choosing "Classic" in About switches this
+       block off and you get the exact v3.4 design back; deleting the block
+       does the same permanently. It only changes colour, depth and blur, never
+       sizes or positions, so layout, capture framing and every feature are as
+       before.
+       Speed: real blur (backdrop-filter) is used only where there is detail
+       behind to frost: the small HUD pieces over the live camera, map
+       controls, popups, the toast and the modal backdrop. Cards on plain
+       backgrounds use tinted layers instead, which look the same and cost
+       nothing to scroll. Phones with ≤2 GB RAM, browsers without blur and
+       "reduce transparency" users get the same look with blur turned off. -->
+  <style id="glass-v36">
+    :root{
+      /* dawn over a field: sky glow from above, leaf glow from below */
+      --g-aurora:
+        radial-gradient(120% 55% at 12% -8%, rgba(34,211,238,.17), transparent 62%),
+        radial-gradient(90% 50% at 100% 4%, rgba(14,165,233,.12), transparent 60%),
+        radial-gradient(130% 60% at 50% 112%, rgba(52,211,153,.13), transparent 62%),
+        #080d1a;
+      --g-hud:rgba(8,13,26,.46);           /* over live video — kept dark for sunlight */
+      --g-bar:rgba(10,16,30,.58);          /* header, tabs, control bars */
+      --g-card:linear-gradient(180deg,rgba(255,255,255,.058),rgba(255,255,255,.022));
+      --g-fill:rgba(255,255,255,.05);
+      --g-fill-hi:rgba(255,255,255,.09);
+      --g-edge:rgba(255,255,255,.10);
+      --g-edge-hi:rgba(255,255,255,.16);
+      --g-shine:inset 0 1px 0 rgba(255,255,255,.075);
+      --g-drop:0 10px 28px -12px rgba(0,0,0,.7);
+      --g-blur:blur(14px) saturate(160%);
+      --g-blur-sm:blur(9px) saturate(150%);
+    }
+    html.g-lite{--g-hud:rgba(8,13,26,.78);--g-bar:rgba(10,16,30,.9)}
+    html.g-lite *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+    @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+      :root{--g-hud:rgba(8,13,26,.78);--g-bar:rgba(10,16,30,.9)}
+    }
+    @media (prefers-reduced-transparency:reduce){
+      :root{--g-hud:rgba(8,13,26,.85);--g-bar:rgba(10,16,30,.94)}
+      *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+    }
+
+    body,#perm,#proj-screen{background:var(--g-aurora)}
+
+    /* header + tabs */
+    #header{background:var(--g-bar);border-bottom-color:var(--g-edge);box-shadow:var(--g-shine)}
+    #about-btn,#gps-btn{background:var(--g-fill)!important;border-color:var(--g-edge)!important;box-shadow:var(--g-shine)}
+    #tabs{background:rgba(10,16,30,.42);border-bottom-color:var(--g-edge)}
+    .tab{position:relative}
+    .tab.active{border-bottom-color:transparent}
+    .tab::before{content:'';position:absolute;inset:5px 10px;border-radius:999px;z-index:-1;border:1px solid transparent;transition:background .2s,border-color .2s,box-shadow .2s}
+    .tab.active::before{background:linear-gradient(180deg,rgba(34,211,238,.20),rgba(34,211,238,.07));border-color:rgba(34,211,238,.38);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 18px -5px rgba(34,211,238,.55)}
+
+    /* camera HUD — frosted over the live video */
+    .hbadge{background:var(--g-hud);border-color:var(--g-edge);border-radius:8px;
+      -webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm);
+      box-shadow:var(--g-shine),0 4px 14px -6px rgba(0,0,0,.65);text-shadow:0 1px 2px rgba(0,0,0,.55)}
+    #compass{border-radius:50%;-webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 22px -8px rgba(0,0,0,.7)}
+    #compass-ring{fill:rgba(8,13,26,.36)}
+    #compass-tap{text-shadow:0 1px 2px rgba(0,0,0,.8)}
+    #tilt-bar{background:var(--g-hud);border-color:var(--g-edge-hi);
+      -webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 22px -10px rgba(0,0,0,.7)}
+    #tilt-deg{background:var(--g-hud);border:1px solid var(--g-edge);-webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm)}
+    #tilt-lbl{text-shadow:0 1px 2px rgba(0,0,0,.8)}
+    .ch-c{box-shadow:0 0 10px rgba(34,211,238,.45)}
+
+    /* control bars under camera and map */
+    #cc,#mc{background:var(--g-bar);border-top-color:var(--g-edge);box-shadow:var(--g-shine)}
+
+    /* buttons — the capture button is the one bold thing: a soft, lit, pressable pill */
+    .bp{background:linear-gradient(180deg,#7ee9fb 0%,#22d3ee 46%,#0ea5e9 100%);color:#03121b;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -3px 8px rgba(2,62,92,.35),0 8px 20px -8px rgba(34,211,238,.7),0 2px 4px rgba(0,0,0,.35);
+      text-shadow:0 1px 0 rgba(255,255,255,.3)}
+    .bp:active{background:linear-gradient(180deg,#22d3ee,#0ea5e9);
+      box-shadow:inset 0 3px 8px rgba(2,40,62,.5),0 2px 8px -4px rgba(34,211,238,.5)}
+    .bs{background:var(--g-fill);border-color:var(--g-edge);box-shadow:var(--g-shine)}
+    .bs:active{background:var(--g-fill-hi)}
+    .bd{box-shadow:var(--g-shine)}
+
+    /* map */
+    .leaflet-container .leaflet-bar{border:1px solid var(--g-edge-hi);border-radius:12px;overflow:hidden;box-shadow:var(--g-drop)}
+    .leaflet-container .leaflet-bar a{background:var(--g-hud);color:var(--text);border-bottom-color:var(--g-edge);
+      -webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm)}
+    .leaflet-container .leaflet-bar a:hover,.leaflet-container .leaflet-bar a:focus{background:rgba(24,32,53,.7);color:var(--green)}
+    .leaflet-container .leaflet-popup-content-wrapper{background:rgba(15,22,38,.72);color:var(--text);border:1px solid var(--g-edge-hi);border-radius:14px;
+      -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);box-shadow:var(--g-shine),var(--g-drop)}
+    .leaflet-container .leaflet-popup-tip{background:rgba(15,22,38,.85);box-shadow:none}
+    .leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+
+    /* data tab */
+    .dc{background:var(--g-card);border-color:var(--g-edge);border-radius:14px;box-shadow:var(--g-shine),0 14px 32px -22px rgba(0,0,0,.9)}
+    .dr{border-bottom-color:rgba(255,255,255,.06)}
+    .kcs{background:var(--g-fill);border-color:var(--g-edge);border-radius:10px;box-shadow:var(--g-shine)}
+    .kcs.on{background:linear-gradient(180deg,rgba(34,211,238,.18),rgba(34,211,238,.06));border-color:rgba(34,211,238,.55);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 22px -8px rgba(34,211,238,.6)}
+    .ci{background:var(--g-fill);border-color:var(--g-edge);border-radius:12px;box-shadow:var(--g-shine)}
+    .cthumb{border-color:var(--g-edge-hi)}
+    .chip{background:var(--g-fill);border-color:var(--g-edge)}
+    .chip.g{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.4)}
+
+    /* start screens — the icon sits in a glass lens */
+    #perm>div:first-child,#proj-screen>div:first-child{width:96px;height:96px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.18),rgba(255,255,255,.03) 46%,rgba(34,211,238,.06) 100%);
+      border:1px solid var(--g-edge-hi);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -10px 24px rgba(34,211,238,.10),0 22px 48px -22px rgba(34,211,238,.55)}
+    .tinput{background:var(--g-fill);border-color:var(--g-edge-hi);box-shadow:var(--g-shine);transition:border-color .2s,box-shadow .2s}
+    .tinput:focus{border-color:var(--green2);box-shadow:var(--g-shine),0 0 0 3px rgba(34,211,238,.18)}
+
+    /* modals — one blur on the backdrop, the panel is a tinted glass sheet */
+    #about-ov,#gps-ov{background:rgba(3,7,16,.5);-webkit-backdrop-filter:blur(8px) saturate(140%);backdrop-filter:blur(8px) saturate(140%)}
+    #about-box,#gps-box{background:linear-gradient(180deg,rgba(26,35,58,.82),rgba(13,20,36,.78));border-color:var(--g-edge-hi);border-radius:20px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 30px 80px -24px rgba(0,0,0,.85)}
+    #about-ov.on #about-box,#gps-ov.on #gps-box{animation:g-rise .22s cubic-bezier(.2,.8,.2,1)}
+    @keyframes g-rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+    #about-x,#gps-x{background:var(--g-fill-hi);border-color:var(--g-edge-hi)}
+    .atag,.gnote,.sat-bar-inner{background-color:var(--g-fill)}
+    .atag,.sat-bar-inner{border-color:var(--g-edge)}
+
+    /* toast */
+    #toast{background:rgba(15,22,38,.72);border-color:var(--g-edge-hi);-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
+      box-shadow:var(--g-shine),var(--g-drop)}
+
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14)}
+    @media (prefers-reduced-motion:reduce){#about-ov.on #about-box,#gps-ov.on #gps-box{animation:none}}
+  </style>
+  <script>
+  /* v3.6 look switch — "classic" turns the glass layer off (exact v3.4 look).
+     Saved per device; shared with the Data Explorer on the same site. */
+  (function(){try{
+    var m=navigator.deviceMemory; if(m&&m<=2) document.documentElement.classList.add('g-lite');
+    if(localStorage.getItem('cv-look')==='classic') document.getElementById('glass-v36').media='not all';
+  }catch(e){}})();
+  function setLook(l){
+    try{localStorage.setItem('cv-look',l);}catch(e){}
+    document.getElementById('glass-v36').media = l==='classic' ? 'not all' : 'all';
+    syncLook();
+  }
+  function syncLook(){
+    var classic=document.getElementById('glass-v36').media==='not all';
+    var g=document.getElementById('look-glass'), c=document.getElementById('look-classic');
+    if(g&&c){g.className='btn '+(classic?'bs':'bp'); c.className='btn '+(classic?'bp':'bs');}
+  }
+  </script>
 </head>
 <body>
 
@@ -332,7 +478,7 @@
   <div id="about-box">
     <div id="about-x" onclick="closeAboutDirect()">✕</div>
     <div class="alogo">CROP<span>VIEW</span></div>
-    <div class="aver">Version 3.4 LTR · Layer 1 of 3 · 2026 · Long-term release</div>
+    <div class="aver">Version 3.6 · Glass · 2026</div>
 
     <div class="asec">
       <h4>👨‍🔬 Developed By</h4>
@@ -360,6 +506,15 @@
         <span class="atag">Sentinel-2</span>
         <span class="atag">GeoJSON</span>
         <span class="atag">IIT Bombay</span>
+      </div>
+    </div>
+
+    <div class="asec">
+      <h4>✨ Look</h4>
+      <p style="margin-bottom:8px">v3.6 adds a frosted-glass look. Prefer the old one? Switch back any time — saved on this phone and in the Data Explorer.</p>
+      <div style="display:flex;gap:8px">
+        <button id="look-glass" class="btn bp" onclick="setLook('glass')">Glass</button>
+        <button id="look-classic" class="btn bs" onclick="setLook('classic')">Classic</button>
       </div>
     </div>
 
@@ -397,7 +552,7 @@
 
   <!-- HEADER -->
 <div id="header">
-  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.4 LTR</span><span class="proj" id="hproj">—</span></div>
+  <div class="logo">CROP<span>VIEW</span> <span style="color:var(--green)">v3.6</span><span class="proj" id="hproj">—</span></div>
   <div id="hdr-right">
     <span id="cap-badge">0 cap</span>
     <div id="gps-btn" onclick="openGPS()" style="font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer;transition:all .2s">📡 GPS</div>
@@ -1499,5 +1654,6 @@ function toast(m,t=''){const e=document.getElementById('toast');e.textContent=m;
 
 updTilt();
 </script>
+<script>syncLook();</script>
 </body>
 </html>

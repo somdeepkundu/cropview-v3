@@ -314,14 +314,89 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
 #col-legend .cl-chip em{font-style:normal;color:var(--txt3)}
 @media(max-width:600px){#col-legend{left:6px;right:6px;gap:10px;padding:8px 12px 6px}#col-legend .cl-title{min-width:0}}
 </style>
+<!-- ═══ v2.3 GLASS LAYER (CropView v3.6) ═══════════════════════════════
+     Sits on top of the unchanged v2.2 rules. The ✨ button in the top bar
+     switches it off (exact v2.2 look). Colour/depth/blur only — no layout
+     changes. Real blur only on floating pieces over the map/photos (top bar,
+     popups, toast, lightbox panels); panels use tinted layers so scrolling
+     and map panning stay fast. Low-RAM phones and "reduce transparency"
+     get the same look without blur. -->
+<style id="glass-v36">
+:root{
+  --g-aurora:radial-gradient(110% 60% at 8% -10%,rgba(34,211,238,.16),transparent 60%),
+    radial-gradient(90% 55% at 100% 0%,rgba(14,165,233,.12),transparent 60%),
+    radial-gradient(120% 60% at 50% 115%,rgba(52,211,153,.12),transparent 62%),#080d1a;
+  --g-bar:rgba(10,16,30,.62);--g-panel:rgba(12,19,34,.72);
+  --g-card:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.022));
+  --g-fill:rgba(255,255,255,.05);--g-fill-hi:rgba(255,255,255,.09);
+  --g-edge:rgba(255,255,255,.10);--g-edge-hi:rgba(255,255,255,.16);
+  --g-shine:inset 0 1px 0 rgba(255,255,255,.075);--g-drop:0 14px 34px -14px rgba(0,0,0,.75);
+  --g-blur:blur(16px) saturate(160%);--g-blur-sm:blur(10px) saturate(150%);
+}
+[data-theme="light"]{
+  --g-aurora:radial-gradient(110% 60% at 8% -10%,rgba(2,132,199,.14),transparent 60%),
+    radial-gradient(120% 60% at 50% 115%,rgba(16,185,129,.10),transparent 62%),#eef2f9;
+  --g-bar:rgba(255,255,255,.66);--g-panel:rgba(255,255,255,.74);
+  --g-card:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.6));
+  --g-fill:rgba(255,255,255,.6);--g-fill-hi:rgba(255,255,255,.85);
+  --g-edge:rgba(15,40,80,.10);--g-edge-hi:rgba(15,40,80,.16);
+  --g-shine:inset 0 1px 0 rgba(255,255,255,.9);--g-drop:0 14px 34px -16px rgba(20,40,80,.35);
+}
+html.g-lite *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.g-lite{--g-bar:rgba(10,16,30,.92)}
+html.g-lite[data-theme="light"]{--g-bar:rgba(255,255,255,.95)}
+@media (prefers-reduced-transparency:reduce){*{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}}
+
+body{background:var(--g-aurora)}
+#topbar{background:var(--g-bar);border-bottom-color:var(--g-edge);box-shadow:var(--g-shine),0 6px 20px -14px rgba(0,0,0,.6);
+  -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);position:relative;z-index:1100}
+.logo-ic{box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 6px 16px -6px rgba(34,211,238,.6)}
+.tbtn{background:var(--g-fill);border-color:var(--g-edge);box-shadow:var(--g-shine)}
+.tbtn:hover{background:var(--g-fill-hi)}
+.tbtn.primary,.act-btn.gradient{background:linear-gradient(180deg,#7ee9fb 0%,#22d3ee 46%,#0ea5e9 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -3px 8px rgba(2,62,92,.3),0 8px 20px -10px rgba(34,211,238,.7)}
+.tabs{background:var(--g-fill);border-color:var(--g-edge);box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
+.tabbtn.on{background:linear-gradient(180deg,#5fe3f8,#22d3ee);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 14px -6px rgba(34,211,238,.7)}
+.panel,.an-toolbar{background:var(--g-panel);border-color:var(--g-edge)}
+#dropzone,#an-dropzone{background:var(--g-fill);border-color:var(--g-edge-hi)}
+.batch-card,.sc,.legend-row{background:var(--g-card);border-color:var(--g-edge);box-shadow:var(--g-shine)}
+.rp-btn,.dir-btn,.act-btn.ghost,.mini-btn,.sel-styled,.custom-row input,.cc-in{background:var(--g-fill);border-color:var(--g-edge)}
+.dir-wrap{border-color:var(--g-edge)}
+.rp-btn.on,.dir-btn.on,.sw input:checked+.sl{background:linear-gradient(180deg,#5fe3f8,#22d3ee);box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.sl{box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+.thumb{box-shadow:0 6px 14px -8px rgba(0,0,0,.7)}
+.leaflet-container .leaflet-bar{border:1px solid var(--g-edge-hi)!important;border-radius:12px;overflow:hidden;box-shadow:var(--g-drop)!important}
+.leaflet-container .leaflet-bar a{background:var(--g-bar);color:var(--txt);border-bottom-color:var(--g-edge);
+  -webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm)}
+.leaflet-popup-content-wrapper{background:var(--g-bar)!important;border:1px solid var(--g-edge-hi)!important;border-radius:14px!important;
+  -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);box-shadow:var(--g-shine),var(--g-drop)!important}
+.leaflet-popup-tip{background:var(--g-bar)!important}
+#toast{background:var(--g-bar);border-color:var(--g-edge-hi);-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);box-shadow:var(--g-shine),var(--g-drop)}
+#restore-banner{-webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm)}
+table.an-table thead th{background:var(--g-bar);-webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm)}
+#lightbox{-webkit-backdrop-filter:blur(10px) saturate(130%);backdrop-filter:blur(10px) saturate(130%)}
+#lb-details,#lb-zoom,#lb-keys,.lb-arrow,#lb-close{background:rgba(10,16,30,.6)!important;border:1px solid rgba(255,255,255,.14)!important;
+  -webkit-backdrop-filter:var(--g-blur-sm);backdrop-filter:var(--g-blur-sm);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 10px 26px -12px rgba(0,0,0,.8)}
+.panel-scroll::-webkit-scrollbar-thumb{background:var(--g-edge-hi)}
+</style>
+<script>
+/* look switch — shared with the camera app (same site, key cv-look) */
+(function(){try{var m=navigator.deviceMemory;if(m&&m<=2)document.documentElement.classList.add('g-lite');
+  if(localStorage.getItem('cv-look')==='classic')document.getElementById('glass-v36').media='not all';}catch(e){}})();
+function toggleLook(){var s=document.getElementById('glass-v36'),c=s.media!=='not all';s.media=c?'not all':'all';
+  try{localStorage.setItem('cv-look',c?'classic':'glass');}catch(e){}
+  var b=document.getElementById('look-btn');if(b)b.style.opacity=c?.45:1;
+  if(typeof showToast==='function')try{showToast(c?'Classic look':'Glass look','ok',1800);}catch(e){}}
+</script>
 </head>
 <body>
+<script>try{if(localStorage.getItem('cv-look')==='classic')document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('look-btn');if(b)b.style.opacity=.45;});}catch(e){}</script>
 
 <!-- ═══ TOP BAR ═══ -->
 <div id="topbar">
   <div class="logo">
     <div class="logo-ic">🌾</div>
-    <div class="logo-tx"><b>CropView v2</b><small>Multi-ZIP Mapper &amp; Annotator · v2.2</small></div>
+    <div class="logo-tx"><b>CropView v2</b><small>Multi-ZIP Mapper &amp; Annotator · v2.3</small></div>
   </div>
   <div class="tabs">
     <button class="tabbtn on" data-tab="map" onclick="switchTab('map')">🗺️ Map</button>
@@ -334,6 +409,7 @@ table.an-table tr.an-row.sel{background:rgba(34,211,238,.1)}
   <button class="tbtn" id="toggle-panel-btn" onclick="togglePanel()">
     <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Controls
   </button>
+  <button class="tbtn" id="look-btn" onclick="toggleLook()" title="Glass / Classic look" style="width:36px;height:36px;padding:0;justify-content:center;font-size:15px">✨</button>
   <button class="tbtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
 </div>
 

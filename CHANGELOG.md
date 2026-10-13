@@ -2,6 +2,16 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## Capture app v3.6 + Data Explorer v2.3 — 2026-10-13
+
+### Changed
+- New frosted-glass look in both apps: soft aurora background, frosted HUD over the camera, glass map controls, popups, toast and modals, a lit capture button.
+- Colour, depth and blur only — no sizes, positions or features changed. Real blur is used only on small floating pieces; low-RAM phones (≤2 GB) and "reduce transparency" get the same look without blur.
+
+### Added
+- Glass / Classic switch: About → Look in the camera app, ✨ in the Data Explorer top bar. Shared between both apps on the same device.
+- Rollback: tag `v3.4.0-ltr` is the previous design.
+
 ## Data Explorer v2.2 — 2026-10-11
 
 ### Added

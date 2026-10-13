@@ -1,6 +1,6 @@
 {
   "name": "cropview-v3",
-  "version": "3.4.0",
+  "version": "3.6.0",
   "private": true,
   "description": "CropView v3 — geo-tagged field crop capture. Web (GitHub Pages) + Android (Capacitor) from one index.html",
   "main": "index.html",
