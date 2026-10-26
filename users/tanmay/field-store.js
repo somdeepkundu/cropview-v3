@@ -43,9 +43,32 @@
     DB.delCap = async id => {
       if (DB.mem) { delete DB.memCaps[id]; delete DB.memPhotos[id]; return; }
       await req('caps', 'readwrite', s => s.delete(id)); await req('photos', 'readwrite', s => s.delete(id));
+      await req('photos', 'readwrite', s => s.delete(IDBKeyRange.bound(id + '#', id + '#￿')));
     };
     DB.putPhoto = async (id, blob) => { if (DB.mem) { DB.memPhotos[id] = blob; return; } await req('photos', 'readwrite', s => s.put(blob, id)); };
     DB.getPhoto = async id => { if (DB.mem) return DB.memPhotos[id] || null; return (await req('photos', 'readonly', s => s.get(id))) || null; };
+    /* Video is written in pieces while recording ("<id>#000001", …), so a crash or a
+       dead battery mid-take loses seconds, not the clip. joinParts() glues them into
+       one Blob under <id> and removes the pieces. */
+    const partRange = id => IDBKeyRange.bound(id + '#', id + '#￿');
+    DB.putPart = async (id, seq, blob) => {
+      const k = id + '#' + String(seq).padStart(6, '0');
+      if (DB.mem) { DB.memPhotos[k] = blob; return; }
+      await req('photos', 'readwrite', s => s.put(blob, k));
+    };
+    DB.getParts = async id => {
+      if (DB.mem) return Object.keys(DB.memPhotos).filter(k => k.startsWith(id + '#')).sort().map(k => DB.memPhotos[k]);
+      return (await req('photos', 'readonly', s => s.getAll(partRange(id)))) || [];
+    };
+    DB.joinParts = async (id, type) => {
+      const parts = await DB.getParts(id);
+      if (!parts.length) return null;
+      const blob = new Blob(parts, { type });
+      await DB.putPhoto(id, blob);
+      if (DB.mem) Object.keys(DB.memPhotos).filter(k => k.startsWith(id + '#')).forEach(k => delete DB.memPhotos[k]);
+      else await req('photos', 'readwrite', s => s.delete(partRange(id)));
+      return blob;
+    };
     DB.capsFor = async project => {
       if (DB.mem) return Object.values(DB.memCaps).filter(c => c.project === project);
       return (await req('caps', 'readonly', s => s.index('project').getAll(project))) || [];

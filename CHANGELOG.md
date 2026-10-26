@@ -2,6 +2,17 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## Powai Lake Survey 1.1.0 — 2026-10-26
+
+### Added
+- Video with a once-a-second log of position, heading, tilt, footprint and aim point. Tapping a type while filming marks that moment. Export adds the clip, a matching `.srt`, a track GeoJSON and a per-second CSV. Clips play in the Data tab with the log under the video.
+- Clips are written to the phone every 3 s and recovered after a crash.
+- ↻ camera restart button, plus a watchdog that restarts a frozen or ended camera by itself.
+
+### Fixed
+- Four of the seven shoot types were off-screen and the row could not be swiped. They are now a two-row grid with a Photo/Video switch and one shutter.
+- After an update, the app reloads by itself when no survey is open.
+
 ## Powai Lake Survey 1.0.0 — 2026-10-26
 
 ### Added

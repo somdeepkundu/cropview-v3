@@ -89,6 +89,11 @@
         </svg>
       </button>
 
+      <!-- Always here: restarts the camera if the picture freezes (it also restarts by itself). -->
+      <button id="cam-refresh" type="button" aria-label="Restart camera" title="Restart camera">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
       <div id="tilt" aria-hidden="true">
         <div id="tilt-bar"><div id="tilt-zone"></div><div id="tilt-pin"></div></div>
         <b id="tilt-deg">—</b><small id="tilt-lbl">TILT</small>
@@ -97,7 +102,20 @@
       <div id="cross" aria-hidden="true"><i></i><i></i></div>
       <div id="aim-tag">AIM —</div>
 
-      <div id="shoot"></div>
+      <div id="rec-badge" hidden><i></i><b id="rec-time">0:00</b><small id="rec-info"></small></div>
+
+      <!-- Pick a type (it stays picked), then the shutter. All seven fit on screen: no swiping. -->
+      <div id="dock">
+        <div id="types" role="radiogroup" aria-label="Shoot type"></div>
+        <div id="shutter-row">
+          <div class="mode" role="radiogroup" aria-label="Photo or video">
+            <button type="button" role="radio" data-mode="photo" aria-checked="true">Photo</button>
+            <button type="button" role="radio" data-mode="video" aria-checked="false">Video</button>
+          </div>
+          <button type="button" id="shutter" aria-label="Take photo"><span></span></button>
+          <div id="last" aria-live="polite"></div>
+        </div>
+      </div>
     </section>
 
     <section class="panel" id="p-map">
@@ -123,7 +141,7 @@
         </div>
         <p class="fine" id="store-info">—</p>
 
-        <h3>Photos</h3>
+        <h3>Photos and videos</h3>
         <div id="cap-list"></div>
 
         <h3>Field notes</h3>
@@ -133,11 +151,21 @@
           <li><b>From a car</b>, shoot through an open window with the phone held out; the body and engine pull the compass. The heading is always the camera's, never the road's.</li>
           <li><b>GPS:</b> open sky helps; buildings, trees and car roofs hurt. Shots above ± 30 m are blocked.</li>
           <li><b>Tilt</b> between 40° and 80° from straight down keeps the crosshair point reliable.</li>
+          <li><b>Video</b> logs position, direction and tilt every second. Keep the app on screen while filming: locking the phone or switching apps stops the clip (what was filmed is kept). Tap a type while filming to mark that moment.</li>
         </ul>
         <p class="fine credit">Powai Lake Survey <span id="ver"></span> · Somdeep Kundu, RuDRA Lab, C-TARA, IIT Bombay · MIT</p>
       </div>
     </section>
   </main>
+</div>
+
+<!-- Clip player: the readout under the video follows the 1-second log. -->
+<div id="player" hidden role="dialog" aria-modal="true" aria-label="Play clip">
+  <div class="pl-in">
+    <video id="pl-video" controls playsinline></video>
+    <div id="pl-read">—</div>
+    <button type="button" id="pl-close">Close</button>
+  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>

@@ -5,7 +5,7 @@
      so a map browsed before going out still shows offline.
    Bump VERSION whenever any cached file changes (keep it equal to app.js APP.version
    and package.json "version"). */
-const VERSION = 'powai-lake-survey-1.0.0';
+const VERSION = 'powai-lake-survey-1.1.0';
 const TILE_CACHE = 'powai-lake-survey-tiles';
 const TILE_MAX = 3000;
 const SHELL = [
