@@ -231,6 +231,7 @@
   /* ── Type picker + mode + shutter. The type stays picked, so each photo is still
        one tap; while filming, tapping a type marks that moment in the log. ── */
   function renderTypes() {
+    $('types').style.setProperty('--cols', Math.min(4, CLASSES.length));
     $('types').innerHTML = CLASSES.map(c => `<button type="button" role="radio" class="tbtn" data-cls="${esc(c.k)}" style="--c:${c.col}" aria-checked="${c.k === S.cls}">${esc(c.label)}</button>`).join('');
     $('types').querySelectorAll('.tbtn').forEach(b => b.addEventListener('click', () => pickType(b.dataset.cls)));
     $('map-legend').innerHTML = CLASSES.map(c => `<span><i style="background:${c.col}"></i>${esc(c.label)}</span>`).join('') + '<span><i style="background:transparent;border-style:dashed"></i>video path</span>';
