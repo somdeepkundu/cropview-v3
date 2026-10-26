@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Scripts only from this site; images from this site and the two tile servers; no forms, plugins or outside connections. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://server.arcgisonline.com; media-src 'self' blob:; connect-src 'self' blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Powai Lake Survey</title>
+  <meta name="description" content="Geo-tagged field photos with camera look direction, tilt, ground footprint and the point under the crosshair. Works offline." />
+  <meta name="theme-color" content="#0f1311" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <!-- Everything is served from this site (no CDNs), so the app keeps working with no network. -->
+  <link rel="stylesheet" href="vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="sensor-core.js"></script>
+  <script src="field-store.js"></script>
+</head>
+<body>
+
+<!-- ① One tap asks for everything: the motion-sensor prompt only appears inside a tap. -->
+<section class="screen on" id="scr-allow" aria-labelledby="allow-h">
+  <div class="screen-in">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M32 6v10M32 48v10M6 32h10M48 32h10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M32 13l4 9h-8z" fill="var(--acc)"/></svg>
+    <h1 id="allow-h">Powai Lake Survey</h1>
+    <p class="lede">Every photo keeps where you stood, which way the camera looked, how far it tilted, and the spot under the crosshair.</p>
+    <ol class="steps">
+      <li>Allow camera, location and motion sensors.</li>
+      <li>Wait in the open until the accuracy reads <b>± 12 m</b> or better.</li>
+      <li>If the direction looks wrong, tap the compass and draw a figure-8 with the phone.</li>
+    </ol>
+    <button class="primary" id="allow" type="button">Allow and continue</button>
+    <p class="fine" id="offline-state">Checking offline mode…</p>
+  </div>
+</section>
+
+<!-- ② Survey: new or resume. -->
+<section class="screen" id="scr-session" aria-labelledby="sess-h">
+  <div class="screen-in">
+    <h2 id="sess-h">Survey</h2>
+    <label class="fld">Name<input id="pname" autocomplete="off" placeholder="e.g. Powai_Sunrise_Scout" maxlength="60" /></label>
+    <label class="fld">Camera height above ground (m)<input id="pcamh" type="number" inputmode="decimal" value="1.5" min="0.2" max="60" step="0.1" />
+      <small>Standing ≈ 1.5 m. This is height above the ground, not GPS altitude.</small></label>
+    <label class="fld">Notes<input id="pnotes" autocomplete="off" placeholder="shoot day, weather, phone model" /></label>
+    <button class="primary" id="start-btn" type="button">Start survey</button>
+    <div id="resume-wrap" hidden>
+      <h3>Continue a saved survey</h3>
+      <div id="resume-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ③ The app. -->
+<div id="app" hidden>
+  <header id="bar">
+    <div class="who"><b id="h-proj">—</b><small id="h-count">0 photos</small></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" class="tab on" data-tab="cam" aria-selected="true">Camera</button>
+      <button role="tab" class="tab" data-tab="map" aria-selected="false">Map</button>
+      <button role="tab" class="tab" data-tab="data" aria-selected="false">Data</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel on" id="p-cam">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="snap" hidden></canvas>
+      <div id="flash"></div>
+
+      <div class="hud" aria-live="off">
+        <span class="chip" id="h-pos">LAT —  LON —</span>
+        <span class="chip warn" id="h-acc">GPS…</span>
+        <span class="chip" id="h-hdg">HDG —</span>
+        <span class="chip bad" id="h-src">SRC —</span>
+      </div>
+
+      <button id="compass" type="button" aria-label="Recalibrate compass">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle id="ring" cx="32" cy="32" r="29" fill="rgba(10,14,12,.55)" stroke-width="2.5"/>
+          <g id="rose">
+            <path d="M32 7v5M32 52v5M7 32h5M52 32h5" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round"/>
+            <text x="32" y="21" text-anchor="middle" class="rose-n">N</text>
+          </g>
+          <path d="M32 18l5 14-5-3-5 3z" fill="var(--text)"/>
+        </svg>
+      </button>
+
+      <div id="tilt" aria-hidden="true">
+        <div id="tilt-bar"><div id="tilt-zone"></div><div id="tilt-pin"></div></div>
+        <b id="tilt-deg">—</b><small id="tilt-lbl">TILT</small>
+      </div>
+
+      <div id="cross" aria-hidden="true"><i></i><i></i></div>
+      <div id="aim-tag">AIM —</div>
+
+      <div id="shoot"></div>
+    </section>
+
+    <section class="panel" id="p-map">
+      <div id="map"></div>
+      <div class="map-btns">
+        <button type="button" id="b-centre" aria-label="Centre on me">◎</button>
+        <button type="button" id="b-sat" aria-label="Satellite imagery" aria-pressed="false">SAT</button>
+      </div>
+      <div id="map-legend"></div>
+    </section>
+
+    <section class="panel" id="p-data">
+      <div class="sheet">
+        <h3>Live sensors</h3>
+        <dl class="kv" id="kv"></dl>
+        <label class="fld inline">Camera height (m)<input id="camh-edit" type="number" inputmode="decimal" min="0.2" max="60" step="0.1" /><button type="button" id="camh-set">Set</button></label>
+
+        <h3>Export</h3>
+        <div class="row">
+          <button type="button" class="primary" id="b-zip">Export ZIP</button>
+          <button type="button" id="b-share" hidden>Share ZIP</button>
+          <button type="button" id="b-csv">CSV</button>
+        </div>
+        <p class="fine" id="store-info">—</p>
+
+        <h3>Photos</h3>
+        <div id="cap-list"></div>
+
+        <h3>Field notes</h3>
+        <ul class="tips">
+          <li><b>Compass off?</b> Tap the compass and draw a slow figure-8 with the phone, away from metal.</li>
+          <li><b>No magnetic mounts or cases.</b> A magnet next to the phone bends the compass for every shot.</li>
+          <li><b>From a car</b>, shoot through an open window with the phone held out; the body and engine pull the compass. The heading is always the camera's, never the road's.</li>
+          <li><b>GPS:</b> open sky helps; buildings, trees and car roofs hurt. Shots above ± 30 m are blocked.</li>
+          <li><b>Tilt</b> between 40° and 80° from straight down keeps the crosshair point reliable.</li>
+        </ul>
+        <p class="fine credit">Powai Lake Survey <span id="ver"></span> · Somdeep Kundu, RuDRA Lab, C-TARA, IIT Bombay · MIT</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

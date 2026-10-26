@@ -2,6 +2,12 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## Powai Lake Survey 1.0.0 — 2026-10-26
+
+### Added
+- `users/tanmay/`: a separate field app for Tanmay, scouting shoot locations at Powai Lake, Mumbai.
+- Seven shoot types (Viewpoint, Promenade, Birds & wildlife, Golden hour, People & life, Landmark, Hazard / restricted), map view cones, ZIP export, offline use.
+
 ## CropView 3S (Swarnakhali field edition) 3S.1.0 — 2026-10-26
 
 ### Added

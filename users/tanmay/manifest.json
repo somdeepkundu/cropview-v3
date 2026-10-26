@@ -1,0 +1,17 @@
+{
+  "name": "Powai Lake Survey",
+  "short_name": "Powai Lake Survey",
+  "description": "Geo-tagged shoot-location scouting for Tanmay at Powai Lake, Mumbai. Works offline.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1311",
+  "theme_color": "#0f1311",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
