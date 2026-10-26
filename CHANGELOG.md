@@ -2,6 +2,14 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## CropView 3S (Swarnakhali field edition) 3S.1.0 — 2026-10-26
+
+### Added
+- `users/saikat/`: a separate field app for Saikat in Swarnakhali, West Bengal. It uses the CropView look with a green tint.
+- Tag chips above the shutter (sticky, custom tags, Bengali labels), and retag or note per photo on the Data tab.
+- Bengali (Bangabda, West Bengal Panjika) date on screen and in every export record.
+- First-run tutorial.
+
 ## Capture app v3.6 + Data Explorer v2.3 — 2026-10-13
 
 ### Changed

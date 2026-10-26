@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://server.arcgisonline.com; media-src 'self' blob:; connect-src 'self' blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CropView 3S · Swarnakhali</title>
+  <meta name="description" content="CropView 3S field edition for Swarnakhali: tagged, geo-located field photos with look direction and tilt, Bengali date, works offline." />
+  <meta name="theme-color" content="#06110c" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="sensor-core.js"></script>
+  <script src="field-store.js"></script>
+  <script src="bcal.js"></script>
+</head>
+<body>
+
+<!-- ① Start: one tap asks for camera, location and motion sensors -->
+<section class="screen on" id="scr-allow">
+  <div class="screen-in">
+    <div class="brand big"><b>CROP</b>VIEW <span>3S</span></div>
+    <div class="place">Swarnakhali · স্বর্ণখালি</div>
+    <div class="bdate" id="allow-bdate"></div>
+    <p class="lede">Walk the fields, pick a tag, tap the shutter. Every photo keeps where you stood, which way you looked and the date in both calendars.</p>
+    <label class="fld">Survey name<input id="pname" autocomplete="off" maxlength="60" /></label>
+    <label class="fld">Camera height (m)<input id="pcamh" type="number" inputmode="decimal" value="1.5" min="0.2" max="60" step="0.1" />
+      <small>Standing ≈ 1.5 m. Change it when you stand on a bund or roof.</small></label>
+    <button class="primary" id="allow" type="button">Allow &amp; start</button>
+    <div id="resume-wrap" hidden>
+      <h3>Continue</h3>
+      <div id="resume-list"></div>
+    </div>
+    <p class="fine" id="offline-state">Checking offline mode…</p>
+  </div>
+</section>
+
+<!-- ② App -->
+<div id="app" hidden>
+  <header id="bar">
+    <div class="who">
+      <div class="brand"><b>CROP</b>VIEW <span>3S</span></div>
+      <div class="sub" id="h-proj">—</div>
+    </div>
+    <div class="bar-r">
+      <span class="count" id="h-count">0 cap</span>
+      <button type="button" class="pill-btn" id="b-help" aria-label="About and tutorial">ⓘ</button>
+    </div>
+  </header>
+  <div class="bstrip" id="bstrip"></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab on" data-tab="cam" aria-selected="true">CAPTURE</button>
+    <button role="tab" class="tab" data-tab="map" aria-selected="false">MAP</button>
+    <button role="tab" class="tab" data-tab="data" aria-selected="false">DATA</button>
+  </nav>
+
+  <main>
+    <section class="panel on" id="p-cam">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="snap" hidden></canvas>
+      <div id="flash"></div>
+
+      <div class="hud">
+        <span class="chip warn" id="h-acc">GPS…</span>
+        <span class="chip" id="h-hdg">HDG —</span>
+        <span class="chip" id="h-tilt">TILT —</span>
+      </div>
+      <span class="chip bad src" id="h-src">SRC —</span>
+
+      <button id="compass" type="button" aria-label="Recalibrate compass">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle id="ring" cx="32" cy="32" r="29" stroke-width="2"/>
+          <g id="rose">
+            <path d="M32 6v6M32 52v6M6 32h6M52 32h6" stroke="currentColor" stroke-opacity=".55" stroke-width="1.6" stroke-linecap="round"/>
+            <text x="32" y="22" text-anchor="middle" class="rose-n">N</text>
+          </g>
+          <path d="M32 19l5 13-5-3-5 3z" fill="var(--green)"/>
+        </svg>
+      </button>
+
+      <div id="cross" aria-hidden="true"><i></i><i></i></div>
+
+      <div class="deck">
+        <div class="tagrail" id="tagrail" role="radiogroup" aria-label="Tag for the next photo"></div>
+        <div class="shootrow">
+          <button type="button" id="last" aria-label="Last photo"><img id="last-img" alt="" /></button>
+          <button type="button" id="shutter" aria-label="Capture"><span id="shutter-core"></span></button>
+          <div class="cur-tag" id="cur-tag"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="p-map">
+      <div id="map"></div>
+      <div class="map-btns">
+        <button type="button" id="b-centre" aria-label="Centre on me">◎</button>
+        <button type="button" id="b-sat" aria-pressed="false">SAT</button>
+      </div>
+      <div id="map-legend"></div>
+    </section>
+
+    <section class="panel" id="p-data">
+      <div class="sheet">
+        <div class="card">
+          <h3>Export</h3>
+          <div class="row">
+            <button type="button" class="primary" id="b-zip">Export ZIP</button>
+            <button type="button" class="ghost" id="b-share" hidden>Share ZIP</button>
+          </div>
+          <p class="fine" id="store-info">—</p>
+        </div>
+        <div class="card">
+          <h3>Tags</h3>
+          <div id="tag-manage"></div>
+          <div class="row add-row">
+            <input id="new-tag" placeholder="New tag, e.g. Jute" maxlength="32" autocomplete="off" />
+            <button type="button" class="ghost" id="b-add-tag">Add</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 id="cap-h">Captures (0)</h3>
+          <div id="cap-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- New tag sheet (from the + chip on the camera) -->
+<div class="sheet-ov" id="tag-sheet" hidden>
+  <div class="sheet-box">
+    <h3>New tag</h3>
+    <input id="sheet-tag" placeholder="e.g. Jute · পাট" maxlength="32" autocomplete="off" />
+    <div class="row"><button type="button" class="ghost" id="sheet-cancel">Cancel</button><button type="button" class="primary" id="sheet-ok">Add tag</button></div>
+  </div>
+</div>
+
+<!-- About -->
+<div class="sheet-ov" id="about" hidden>
+  <div class="sheet-box">
+    <div class="brand"><b>CROP</b>VIEW <span>3S</span></div>
+    <p class="fine" id="about-bdate"></p>
+    <ul class="tips">
+      <li><b>Direction off?</b> Tap the compass, draw a slow figure-8, away from metal.</li>
+      <li><b>GPS:</b> wait for ± 12 m in the open. Shots over ± 30 m are blocked.</li>
+      <li><b>Offline:</b> open the map once on Wi-Fi; the tiles you saw stay on the phone.</li>
+      <li><b>Before you leave the field,</b> export a ZIP.</li>
+    </ul>
+    <div class="row"><button type="button" class="ghost" id="b-tour">Show tutorial</button><button type="button" class="primary" id="about-close">Close</button></div>
+    <p class="fine credit">CropView 3S <span id="ver"></span> · field edition for Saikat · Somdeep Kundu, RuDRA Lab, C-TARA, IIT Bombay · MIT</p>
+  </div>
+</div>
+
+<!-- First-run tutorial -->
+<div id="tour" hidden>
+  <div id="tour-hole"></div>
+  <div id="tour-card" role="dialog" aria-live="polite">
+    <div class="t-step" id="tour-step"></div>
+    <h4 id="tour-h"></h4>
+    <p id="tour-p"></p>
+    <p class="bn" id="tour-bn"></p>
+    <div class="row"><button type="button" class="ghost" id="tour-skip">Skip</button><button type="button" class="primary" id="tour-next">Next</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
