@@ -2,6 +2,17 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## Shevga 1.0.0 — 2026-10-27
+
+### Added
+- `users/priyanka/`: a field notebook for Priyanka's survey of the moringa (Shevga) trees on the IIT Bombay campus.
+- Tree-first workflow. Each photo belongs to a tree, named by its inventory tag. The tag can be scanned from the QR (BarcodeDetector on Android, jsQR on iPhone) or typed; the painted number is kept too.
+- Tree position by any of three methods: GPS averaged at the trunk, the crosshair point from open ground, or whole-tree photo directions crossed by least squares. All three are exported.
+- Visits: leaf state (flush / not flush / mixed / bare), flowers, pods, sample bag, note.
+- Compass trust from phone-sensor-lab: compass vs gyroscope, `heading_trust` on every photo. Disturbed directions are not used for positions.
+- Eight photo types in a 4×2 grid that fits on screen at 320–412 px, ↻ camera restart and freeze watchdog, illustrated tutorial plus a spotlight tour, field guide, campus-box warning.
+- Link preview image (Open Graph) for WhatsApp and other apps.
+
 ## Powai Lake Survey 1.1.0 — 2026-10-26
 
 ### Added

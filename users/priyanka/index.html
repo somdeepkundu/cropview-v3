@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Scripts only from this site; images from this site and the two tile servers; no forms, plugins or outside connections. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://server.arcgisonline.com; media-src 'self' blob:; connect-src 'self' blob: data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Shevga</title>
+  <meta name="description" content="Field notebook for the moringa (Shevga) trees of IIT Bombay: tag, position, look direction, tilt, photos and leaf state for every tree. Works offline." />
+  <!-- Link preview (WhatsApp, Telegram, LinkedIn…): needs an absolute image URL. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="IIT Bombay" />
+  <meta property="og:title" content="Shevga — moringa trees of IIT Bombay" />
+  <meta property="og:description" content="Field notebook for the campus moringa trees: tag, position, look direction and leaf state, tree by tree. Works offline." />
+  <meta property="og:url" content="https://somdeepkundu.github.io/cropview-v3/users/priyanka/" />
+  <meta property="og:image" content="https://somdeepkundu.github.io/cropview-v3/users/priyanka/icons/og.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="A drawn moringa sprig beside photos of a tagged campus tree and its leaves" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#f2ecdf" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <!-- Everything is served from this site (no CDNs), so the app keeps working with no network. -->
+  <link rel="stylesheet" href="vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="sensor-core.js"></script>
+  <script src="sensor-lab.js"></script>
+  <script src="field-store.js"></script>
+</head>
+<body>
+
+<!-- ① Title plate. One tap asks for everything: the motion-sensor prompt only appears inside a tap. -->
+<section class="screen paper on" id="scr-allow" aria-labelledby="allow-h">
+  <div class="screen-in plate">
+    <p class="plate-no">Pl. I &nbsp;·&nbsp; IIT Bombay campus</p>
+    <svg class="sprig" viewBox="-12 -6 400 486" aria-hidden="true"><g class="pods"><path class="pod" d="M72 318 C 80 362, 92 410, 86 470"/><path class="pod" d="M76 314 C 96 352, 116 398, 122 452"/><path class="rib" d="M72 318 C 80 362, 92 410, 86 470"/><path class="rib" d="M76 314 C 96 352, 116 398, 122 452"/></g><g class="stems"><path class="main" d="M36 420Q110 170 318 70"/><path d="M55.7 362.2Q31.4 322.7 7.0 264.1"/><path d="M55.7 362.2Q108.9 362.8 162.2 336.6"/><path d="M78.0 311.1Q60.4 283.2 42.8 216.0"/><path d="M78.0 311.1Q128.1 332.3 178.2 295.5"/><path d="M103.9 263.9Q93.6 233.6 83.3 172.9"/><path d="M103.9 263.9Q150.5 283.1 197.1 260.7"/><path d="M133.2 220.7Q127.7 190.5 122.2 136.2"/><path d="M133.2 220.7Q175.8 226.3 218.4 217.0"/><path d="M166.1 181.4Q163.8 156.7 161.5 104.4"/><path d="M166.1 181.4Q204.5 205.8 242.9 187.7"/><path d="M202.4 146.0Q202.4 131.3 202.4 76.9"/><path d="M202.4 146.0Q236.5 171.1 270.5 157.1"/><path d="M242.2 114.5Q245.2 101.2 248.2 53.9"/><path d="M242.2 114.5Q272.3 130.9 302.4 124.2"/><path d="M285.6 87.0Q289.0 75.0 292.4 34.5"/><path d="M318.0 70.0Q345.0 71.8 372.1 44.0"/></g><g class="lfs"><ellipse cx="40.9" cy="348.1" rx="6.6" ry="3.7" transform="rotate(-186.3 40.9 348.1)"/><ellipse cx="50.3" cy="342.4" rx="6.6" ry="3.7" transform="rotate(-56.8 50.3 342.4)"/><ellipse cx="33.1" cy="330.9" rx="5.7" ry="3.4" transform="rotate(-173.0 33.1 330.9)"/><ellipse cx="41.4" cy="327.4" rx="5.7" ry="3.4" transform="rotate(-53.4 41.4 327.4)"/><ellipse cx="24.4" cy="314.4" rx="5.7" ry="3.2" transform="rotate(-180.2 24.4 314.4)"/><ellipse cx="33.5" cy="310.8" rx="5.7" ry="3.2" transform="rotate(-42.7 33.5 310.8)"/><ellipse cx="15.6" cy="296.3" rx="5.8" ry="3.3" transform="rotate(-183.4 15.6 296.3)"/><ellipse cx="25.1" cy="292.7" rx="5.8" ry="3.3" transform="rotate(-38.4 25.1 292.7)"/><ellipse cx="6.3" cy="277.5" rx="6.5" ry="3.9" transform="rotate(-190.1 6.3 277.5)"/><ellipse cx="15.4" cy="271.3" rx="6.5" ry="3.9" transform="rotate(-57.8 15.4 271.3)"/><ellipse cx="4.1" cy="257.1" rx="7.5" ry="4.7" transform="rotate(-112.5 4.1 257.1)"/><ellipse cx="76.9" cy="356.6" rx="5.8" ry="3.3" transform="rotate(-66.0 76.9 356.6)"/><ellipse cx="76.6" cy="366.5" rx="5.8" ry="3.3" transform="rotate(68.7 76.6 366.5)"/><ellipse cx="94.8" cy="353.9" rx="5.9" ry="3.6" transform="rotate(-78.6 94.8 353.9)"/><ellipse cx="96.9" cy="363.5" rx="5.9" ry="3.6" transform="rotate(53.4 96.9 363.5)"/><ellipse cx="114.7" cy="349.5" rx="6.5" ry="3.6" transform="rotate(-70.3 114.7 349.5)"/><ellipse cx="117.0" cy="359.3" rx="6.5" ry="3.6" transform="rotate(44.7 117.0 359.3)"/><ellipse cx="132.7" cy="343.3" rx="6.7" ry="4.0" transform="rotate(-80.8 132.7 343.3)"/><ellipse cx="135.8" cy="354.0" rx="6.7" ry="4.0" transform="rotate(48.7 135.8 354.0)"/><ellipse cx="150.1" cy="336.1" rx="6.3" ry="3.7" transform="rotate(-96.3 150.1 336.1)"/><ellipse cx="154.7" cy="346.1" rx="6.3" ry="3.7" transform="rotate(46.8 154.7 346.1)"/><ellipse cx="168.9" cy="333.2" rx="7.5" ry="4.7" transform="rotate(-26.2 168.9 333.2)"/><ellipse cx="66.1" cy="300.7" rx="6.2" ry="4.0" transform="rotate(-187.9 66.1 300.7)"/><ellipse cx="74.9" cy="295.2" rx="6.2" ry="4.0" transform="rotate(-55.7 74.9 295.2)"/><ellipse cx="59.1" cy="285.8" rx="6.9" ry="3.9" transform="rotate(-176.8 59.1 285.8)"/><ellipse cx="70.2" cy="282.0" rx="6.9" ry="3.9" transform="rotate(-41.0 70.2 282.0)"/><ellipse cx="54.2" cy="268.6" rx="5.6" ry="3.4" transform="rotate(-165.1 54.2 268.6)"/><ellipse cx="63.1" cy="266.6" rx="5.6" ry="3.4" transform="rotate(-40.1 63.1 266.6)"/><ellipse cx="46.8" cy="251.4" rx="6.6" ry="4.0" transform="rotate(-182.0 46.8 251.4)"/><ellipse cx="57.1" cy="246.8" rx="6.6" ry="4.0" transform="rotate(-45.9 57.1 246.8)"/><ellipse cx="40.6" cy="229.3" rx="6.5" ry="4.0" transform="rotate(-173.4 40.6 229.3)"/><ellipse cx="51.1" cy="226.1" rx="6.5" ry="4.0" transform="rotate(-40.7 51.1 226.1)"/><ellipse cx="40.9" cy="209.0" rx="7.3" ry="4.5" transform="rotate(-104.7 40.9 209.0)"/><ellipse cx="100.0" cy="312.9" rx="6.1" ry="3.8" transform="rotate(-43.6 100.0 312.9)"/><ellipse cx="96.6" cy="322.4" rx="6.1" ry="3.8" transform="rotate(82.7 96.6 322.4)"/><ellipse cx="115.6" cy="313.2" rx="6.4" ry="4.2" transform="rotate(-72.7 115.6 313.2)"/><ellipse cx="116.6" cy="324.0" rx="6.4" ry="4.2" transform="rotate(61.5 116.6 324.0)"/><ellipse cx="133.9" cy="312.1" rx="6.0" ry="3.7" transform="rotate(-66.1 133.9 312.1)"/><ellipse cx="135.0" cy="321.6" rx="6.0" ry="3.7" transform="rotate(53.8 135.0 321.6)"/><ellipse cx="150.7" cy="306.7" rx="5.6" ry="3.2" transform="rotate(-77.8 150.7 306.7)"/><ellipse cx="152.9" cy="315.7" rx="5.6" ry="3.2" transform="rotate(50.0 152.9 315.7)"/><ellipse cx="167.1" cy="297.6" rx="5.6" ry="3.2" transform="rotate(-94.8 167.1 297.6)"/><ellipse cx="171.2" cy="306.2" rx="5.6" ry="3.2" transform="rotate(43.0 171.2 306.2)"/><ellipse cx="184.1" cy="291.2" rx="7.3" ry="4.5" transform="rotate(-36.3 184.1 291.2)"/><ellipse cx="94.7" cy="252.1" rx="6.0" ry="3.9" transform="rotate(-179.2 94.7 252.1)"/><ellipse cx="104.9" cy="249.2" rx="6.0" ry="3.9" transform="rotate(-31.8 104.9 249.2)"/><ellipse cx="91.5" cy="237.2" rx="5.6" ry="3.3" transform="rotate(-166.7 91.5 237.2)"/><ellipse cx="101.0" cy="235.9" rx="5.6" ry="3.3" transform="rotate(-29.3 101.0 235.9)"/><ellipse cx="87.1" cy="220.7" rx="6.6" ry="3.8" transform="rotate(-160.9 87.1 220.7)"/><ellipse cx="97.3" cy="218.6" rx="6.6" ry="3.8" transform="rotate(-42.7 97.3 218.6)"/><ellipse cx="84.2" cy="204.1" rx="5.5" ry="3.3" transform="rotate(-169.1 84.2 204.1)"/><ellipse cx="93.0" cy="201.8" rx="5.5" ry="3.3" transform="rotate(-40.7 93.0 201.8)"/><ellipse cx="81.0" cy="184.2" rx="5.2" ry="3.1" transform="rotate(-163.0 81.0 184.2)"/><ellipse cx="89.5" cy="183.0" rx="5.2" ry="3.1" transform="rotate(-32.7 89.5 183.0)"/><ellipse cx="82.2" cy="166.0" rx="7.0" ry="4.3" transform="rotate(-99.6 82.2 166.0)"/><ellipse cx="123.6" cy="264.9" rx="6.0" ry="3.7" transform="rotate(-55.8 123.6 264.9)"/><ellipse cx="122.4" cy="274.6" rx="6.0" ry="3.7" transform="rotate(69.8 122.4 274.6)"/><ellipse cx="139.3" cy="266.7" rx="6.5" ry="4.2" transform="rotate(-69.2 139.3 266.7)"/><ellipse cx="138.4" cy="278.2" rx="6.5" ry="4.2" transform="rotate(78.0 138.4 278.2)"/><ellipse cx="156.4" cy="267.9" rx="5.8" ry="3.4" transform="rotate(-60.6 156.4 267.9)"/><ellipse cx="156.1" cy="277.4" rx="5.8" ry="3.4" transform="rotate(65.2 156.1 277.4)"/><ellipse cx="172.0" cy="265.5" rx="5.3" ry="2.9" transform="rotate(-71.9 172.0 265.5)"/><ellipse cx="173.9" cy="273.6" rx="5.3" ry="2.9" transform="rotate(45.5 173.9 273.6)"/><ellipse cx="188.5" cy="260.0" rx="5.7" ry="3.2" transform="rotate(-75.5 188.5 260.0)"/><ellipse cx="191.3" cy="268.2" rx="5.7" ry="3.2" transform="rotate(36.9 191.3 268.2)"/><ellipse cx="203.4" cy="257.7" rx="7.0" ry="4.3" transform="rotate(-25.6 203.4 257.7)"/><ellipse cx="126.7" cy="208.1" rx="5.0" ry="3.2" transform="rotate(-167.6 126.7 208.1)"/><ellipse cx="134.7" cy="206.1" rx="5.0" ry="3.2" transform="rotate(-41.2 134.7 206.1)"/><ellipse cx="124.6" cy="194.4" rx="5.3" ry="3.1" transform="rotate(-160.9 124.6 194.4)"/><ellipse cx="133.0" cy="192.8" rx="5.3" ry="3.1" transform="rotate(-40.8 133.0 192.8)"/><ellipse cx="121.8" cy="179.7" rx="6.2" ry="4.1" transform="rotate(-162.4 121.8 179.7)"/><ellipse cx="132.2" cy="178.4" rx="6.2" ry="4.1" transform="rotate(-31.8 132.2 178.4)"/><ellipse cx="121.0" cy="163.6" rx="5.1" ry="2.9" transform="rotate(-158.9 121.0 163.6)"/><ellipse cx="129.1" cy="162.5" rx="5.1" ry="2.9" transform="rotate(-36.1 129.1 162.5)"/><ellipse cx="118.4" cy="144.8" rx="6.2" ry="3.5" transform="rotate(-151.0 118.4 144.8)"/><ellipse cx="128.7" cy="145.6" rx="6.2" ry="3.5" transform="rotate(-19.9 128.7 145.6)"/><ellipse cx="121.5" cy="129.5" rx="6.7" ry="4.2" transform="rotate(-95.8 121.5 129.5)"/><ellipse cx="150.9" cy="217.5" rx="5.8" ry="3.2" transform="rotate(-62.6 150.9 217.5)"/><ellipse cx="149.3" cy="227.5" rx="5.8" ry="3.2" transform="rotate(80.8 149.3 227.5)"/><ellipse cx="166.5" cy="217.8" rx="6.2" ry="3.9" transform="rotate(-60.0 166.5 217.8)"/><ellipse cx="166.2" cy="227.9" rx="6.2" ry="3.9" transform="rotate(63.2 166.2 227.9)"/><ellipse cx="180.5" cy="217.9" rx="5.2" ry="3.3" transform="rotate(-69.8 180.5 217.9)"/><ellipse cx="180.5" cy="226.9" rx="5.2" ry="3.3" transform="rotate(69.1 180.5 226.9)"/><ellipse cx="194.9" cy="216.2" rx="5.5" ry="3.1" transform="rotate(-79.7 194.9 216.2)"/><ellipse cx="195.7" cy="225.8" rx="5.5" ry="3.1" transform="rotate(70.3 195.7 225.8)"/><ellipse cx="209.9" cy="213.1" rx="6.2" ry="4.0" transform="rotate(-83.4 209.9 213.1)"/><ellipse cx="212.0" cy="223.9" rx="6.2" ry="4.0" transform="rotate(61.2 212.0 223.9)"/><ellipse cx="224.9" cy="215.6" rx="6.7" ry="4.2" transform="rotate(-12.2 224.9 215.6)"/><ellipse cx="160.9" cy="166.9" rx="5.3" ry="2.9" transform="rotate(-149.4 160.9 166.9)"/><ellipse cx="169.1" cy="166.7" rx="5.3" ry="2.9" transform="rotate(-33.5 169.1 166.7)"/><ellipse cx="159.4" cy="153.9" rx="5.1" ry="3.2" transform="rotate(-169.9 159.4 153.9)"/><ellipse cx="168.2" cy="152.4" rx="5.1" ry="3.2" transform="rotate(-28.9 168.2 152.4)"/><ellipse cx="157.5" cy="136.4" rx="6.1" ry="4.0" transform="rotate(-169.4 157.5 136.4)"/><ellipse cx="167.9" cy="134.6" rx="6.1" ry="4.0" transform="rotate(-30.3 167.9 134.6)"/><ellipse cx="157.9" cy="115.4" rx="5.1" ry="2.9" transform="rotate(-151.6 157.9 115.4)"/><ellipse cx="166.0" cy="115.0" rx="5.1" ry="2.9" transform="rotate(-33.6 166.0 115.0)"/><ellipse cx="161.2" cy="97.9" rx="6.5" ry="4.0" transform="rotate(-92.5 161.2 97.9)"/><ellipse cx="186.4" cy="185.9" rx="6.0" ry="3.6" transform="rotate(-47.9 186.4 185.9)"/><ellipse cx="182.4" cy="195.5" rx="6.0" ry="3.6" transform="rotate(94.3 182.4 195.5)"/><ellipse cx="201.3" cy="190.4" rx="4.9" ry="3.1" transform="rotate(-66.5 201.3 190.4)"/><ellipse cx="200.2" cy="199.0" rx="4.9" ry="3.1" transform="rotate(81.1 200.2 199.0)"/><ellipse cx="218.6" cy="190.4" rx="5.8" ry="3.5" transform="rotate(-63.4 218.6 190.4)"/><ellipse cx="218.2" cy="200.1" rx="5.8" ry="3.5" transform="rotate(67.6 218.2 200.1)"/><ellipse cx="232.5" cy="186.9" rx="5.2" ry="3.3" transform="rotate(-94.7 232.5 186.9)"/><ellipse cx="236.3" cy="195.2" rx="5.2" ry="3.3" transform="rotate(45.5 236.3 195.2)"/><ellipse cx="248.8" cy="185.0" rx="6.5" ry="4.0" transform="rotate(-25.2 248.8 185.0)"/><ellipse cx="198.1" cy="135.0" rx="5.6" ry="3.2" transform="rotate(-147.3 198.1 135.0)"/><ellipse cx="206.7" cy="135.0" rx="5.6" ry="3.2" transform="rotate(-32.1 206.7 135.0)"/><ellipse cx="197.9" cy="122.9" rx="5.8" ry="3.7" transform="rotate(-147.8 197.9 122.9)"/><ellipse cx="207.5" cy="124.2" rx="5.8" ry="3.7" transform="rotate(-16.6 207.5 124.2)"/><ellipse cx="197.6" cy="107.4" rx="5.9" ry="3.7" transform="rotate(-152.5 197.6 107.4)"/><ellipse cx="207.4" cy="107.8" rx="5.9" ry="3.7" transform="rotate(-23.0 207.4 107.8)"/><ellipse cx="198.1" cy="89.4" rx="4.8" ry="2.6" transform="rotate(-166.7 198.1 89.4)"/><ellipse cx="206.5" cy="88.9" rx="4.8" ry="2.6" transform="rotate(-20.7 206.5 88.9)"/><ellipse cx="202.4" cy="70.8" rx="6.2" ry="3.8" transform="rotate(-90.0 202.4 70.8)"/><ellipse cx="220.4" cy="151.6" rx="5.2" ry="3.3" transform="rotate(-47.4 220.4 151.6)"/><ellipse cx="217.6" cy="159.8" rx="5.2" ry="3.3" transform="rotate(85.2 217.6 159.8)"/><ellipse cx="235.1" cy="157.1" rx="4.9" ry="2.9" transform="rotate(-46.6 235.1 157.1)"/><ellipse cx="232.7" cy="164.9" rx="4.9" ry="2.9" transform="rotate(81.2 232.7 164.9)"/><ellipse cx="249.2" cy="158.3" rx="4.9" ry="2.9" transform="rotate(-58.1 249.2 158.3)"/><ellipse cx="248.0" cy="166.5" rx="4.9" ry="2.9" transform="rotate(74.6 248.0 166.5)"/><ellipse cx="262.3" cy="155.5" rx="5.1" ry="3.0" transform="rotate(-82.5 262.3 155.5)"/><ellipse cx="263.9" cy="164.1" rx="5.1" ry="3.0" transform="rotate(60.5 263.9 164.1)"/><ellipse cx="276.3" cy="154.7" rx="6.2" ry="3.8" transform="rotate(-22.4 276.3 154.7)"/><ellipse cx="239.6" cy="104.7" rx="5.0" ry="3.1" transform="rotate(-148.2 239.6 104.7)"/><ellipse cx="247.7" cy="105.0" rx="5.0" ry="3.1" transform="rotate(-26.9 247.7 105.0)"/><ellipse cx="241.4" cy="93.5" rx="5.0" ry="2.8" transform="rotate(-138.4 241.4 93.5)"/><ellipse cx="249.3" cy="95.6" rx="5.0" ry="2.8" transform="rotate(-11.2 249.3 95.6)"/><ellipse cx="242.3" cy="81.0" rx="4.6" ry="2.8" transform="rotate(-156.2 242.3 81.0)"/><ellipse cx="250.2" cy="81.4" rx="4.6" ry="2.8" transform="rotate(-18.0 250.2 81.4)"/><ellipse cx="243.5" cy="63.6" rx="4.8" ry="2.9" transform="rotate(-153.2 243.5 63.6)"/><ellipse cx="251.7" cy="64.6" rx="4.8" ry="2.9" transform="rotate(-13.6 251.7 64.6)"/><ellipse cx="248.6" cy="47.9" rx="5.9" ry="3.7" transform="rotate(-86.4 248.6 47.9)"/><ellipse cx="258.0" cy="117.2" rx="4.7" ry="2.7" transform="rotate(-51.4 258.0 117.2)"/><ellipse cx="255.6" cy="124.9" rx="4.7" ry="2.7" transform="rotate(86.8 255.6 124.9)"/><ellipse cx="270.5" cy="120.2" rx="5.1" ry="3.2" transform="rotate(-63.4 270.5 120.2)"/><ellipse cx="269.5" cy="129.0" rx="5.1" ry="3.2" transform="rotate(76.5 269.5 129.0)"/><ellipse cx="283.6" cy="121.8" rx="5.2" ry="3.1" transform="rotate(-63.7 283.6 121.8)"/><ellipse cx="282.9" cy="130.6" rx="5.2" ry="3.1" transform="rotate(72.8 282.9 130.6)"/><ellipse cx="295.9" cy="121.2" rx="5.0" ry="3.0" transform="rotate(-72.5 295.9 121.2)"/><ellipse cx="296.2" cy="129.8" rx="5.0" ry="3.0" transform="rotate(68.9 296.2 129.8)"/><ellipse cx="308.2" cy="122.9" rx="5.9" ry="3.7" transform="rotate(-12.6 308.2 122.9)"/><ellipse cx="283.3" cy="75.5" rx="5.3" ry="3.1" transform="rotate(-147.5 283.3 75.5)"/><ellipse cx="292.4" cy="77.7" rx="5.3" ry="3.1" transform="rotate(-4.2 292.4 77.7)"/><ellipse cx="285.7" cy="61.8" rx="5.2" ry="2.9" transform="rotate(-140.2 285.7 61.8)"/><ellipse cx="293.9" cy="63.3" rx="5.2" ry="2.9" transform="rotate(-18.4 293.9 63.3)"/><ellipse cx="288.2" cy="44.7" rx="4.3" ry="2.5" transform="rotate(-140.6 288.2 44.7)"/><ellipse cx="295.1" cy="46.2" rx="4.3" ry="2.5" transform="rotate(-14.8 295.1 46.2)"/><ellipse cx="292.9" cy="28.9" rx="5.7" ry="3.5" transform="rotate(-85.2 292.9 28.9)"/><ellipse cx="333.6" cy="62.8" rx="6.4" ry="3.7" transform="rotate(-84.2 333.6 62.8)"/><ellipse cx="336.3" cy="73.6" rx="6.4" ry="3.7" transform="rotate(56.2 336.3 73.6)"/><ellipse cx="346.8" cy="58.1" rx="5.3" ry="3.4" transform="rotate(-105.0 346.8 58.1)"/><ellipse cx="352.2" cy="65.4" rx="5.3" ry="3.4" transform="rotate(31.0 352.2 65.4)"/><ellipse cx="361.4" cy="46.7" rx="6.5" ry="3.9" transform="rotate(-105.8 361.4 46.7)"/><ellipse cx="367.9" cy="56.0" rx="6.5" ry="3.9" transform="rotate(36.9 367.9 56.0)"/><ellipse cx="376.9" cy="39.1" rx="6.9" ry="4.3" transform="rotate(-45.8 376.9 39.1)"/></g></svg>
+    <h1 id="allow-h">Shevga</h1>
+    <p class="binomial"><i>Moringa oleifera</i> Lam. &nbsp;—&nbsp; drumstick tree</p>
+    <p class="lede">A field notebook for the moringa trees on campus. For every tree it keeps the tag number, where the tree stands, which way each photo looked, and how the leaves are doing on each visit.</p>
+    <button class="primary" id="allow" type="button">Allow camera, location &amp; motion</button>
+    <p class="fine" id="offline-state">Checking offline mode…</p>
+  </div>
+</section>
+
+<!-- ② Field book: new or resume. -->
+<section class="screen paper" id="scr-session" aria-labelledby="sess-h">
+  <div class="screen-in">
+    <p class="plate-no">Field book</p>
+    <h2 id="sess-h">Open the field book</h2>
+    <div id="resume-wrap" hidden>
+      <div id="resume-list"></div>
+      <p class="or"><span>or start a new one</span></p>
+    </div>
+    <label class="fld">Name of the field book<input id="pname" autocomplete="off" value="IITB_Moringa" maxlength="60" /></label>
+    <label class="fld">Collector<input id="pcoll" autocomplete="off" value="Priyanka" maxlength="40" /></label>
+    <label class="fld">Camera height above ground (m)<input id="pcamh" type="number" inputmode="decimal" value="1.5" min="0.2" max="60" step="0.1" />
+      <small>Standing ≈ 1.5 m. Used for the crosshair point, not GPS altitude.</small></label>
+    <label class="fld">Notes<input id="pnotes" autocomplete="off" placeholder="weather, phone, who came along" /></label>
+    <button class="primary" id="start-btn" type="button">Start</button>
+  </div>
+</section>
+
+<!-- ③ The app. -->
+<div id="app" hidden>
+  <header id="bar">
+    <div class="who"><b id="h-proj">—</b><small id="h-count">0 trees</small></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" class="tab on" data-tab="cam" aria-selected="true">Camera</button>
+      <button role="tab" class="tab" data-tab="map" aria-selected="false">Map</button>
+      <button role="tab" class="tab" data-tab="data" aria-selected="false">Trees</button>
+    </nav>
+    <button type="button" id="b-help" class="help" aria-label="Field guide and tutorial">?</button>
+  </header>
+
+  <main>
+    <section class="panel on" id="p-cam">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="snap" hidden></canvas>
+      <div id="flash"></div>
+
+      <div class="hud" aria-live="off">
+        <span class="chip" id="h-pos">LAT —  LON —</span>
+        <span class="chip warn" id="h-acc">GPS…</span>
+        <span class="chip" id="h-hdg">HDG —</span>
+        <span class="chip bad" id="h-src">SRC —</span>
+        <span class="chip warn" id="h-campus" hidden>outside campus?</span>
+      </div>
+
+      <button id="compass" type="button" aria-label="Recalibrate compass">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle id="ring" cx="32" cy="32" r="29" fill="rgba(16,20,15,.55)" stroke-width="2"/>
+          <g id="rose">
+            <path d="M32 6.5v5M32 52.5v5M6.5 32h5M52.5 32h5" stroke="rgba(242,236,223,.55)" stroke-width="1.3" stroke-linecap="round"/>
+            <text x="32" y="21" text-anchor="middle" class="rose-n">N</text>
+          </g>
+          <path d="M32 19l4.5 13-4.5-2.6-4.5 2.6z" fill="#f2ecdf"/>
+        </svg>
+      </button>
+
+      <!-- Always here: restarts the camera if the picture freezes (it also restarts by itself). -->
+      <button id="cam-refresh" type="button" aria-label="Restart camera" title="Restart camera">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div id="tilt" aria-hidden="true">
+        <div id="tilt-bar"><div id="tilt-zone"></div><div id="tilt-pin"></div></div>
+        <b id="tilt-deg">—</b><small id="tilt-lbl">TILT</small>
+      </div>
+
+      <div id="cross" aria-hidden="true"><i></i><i></i></div>
+      <div id="aim-tag">AIM —</div>
+
+      <!-- Trunk lock: averages GPS while she stands at the tree. -->
+      <div id="lockbox" hidden>
+        <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="lk-bg"/><circle cx="22" cy="22" r="19" class="lk-fg" id="lk-arc"/></svg>
+        <div><b id="lk-title">Hold still at the trunk</b><small id="lk-info">collecting GPS…</small></div>
+        <button type="button" id="lk-stop">Done</button>
+      </div>
+
+      <!-- Tag scanner: reads the QR on the inventory tag from the live picture. -->
+      <div id="scan" hidden>
+        <div class="scan-frame"><i></i><i></i><i></i><i></i></div>
+        <p id="scan-msg">Hold the tag's QR code inside the square</p>
+        <button type="button" id="scan-close">Type it instead</button>
+      </div>
+
+      <div id="dock">
+        <button type="button" id="treebar" aria-label="Current tree">
+          <span class="tb-id" id="tb-id">No tree yet</span>
+          <span class="tb-meta" id="tb-meta">Tap to start a tree</span>
+          <span class="tb-go" aria-hidden="true">⌄</span>
+        </button>
+        <!-- Pick what is in the frame (it stays picked), then the shutter. All fit on screen: no swiping. -->
+        <div id="types" role="radiogroup" aria-label="What are you photographing"></div>
+        <div id="shutter-row">
+          <button type="button" id="b-tree" class="side">Tree<br><small>details</small></button>
+          <button type="button" id="shutter" aria-label="Take photo"><span></span></button>
+          <div id="last" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="p-map">
+      <div id="map"></div>
+      <div class="map-btns">
+        <button type="button" id="b-centre" aria-label="Centre on me">◎</button>
+        <button type="button" id="b-campus" aria-label="Whole campus">⌂</button>
+        <button type="button" id="b-sat" aria-label="Satellite imagery" aria-pressed="false">SAT</button>
+      </div>
+      <div id="map-legend"></div>
+    </section>
+
+    <section class="panel paper" id="p-data">
+      <div class="sheet">
+        <div class="sum" id="sum"></div>
+
+        <h3>Export</h3>
+        <div class="row">
+          <button type="button" class="primary" id="b-zip">Export ZIP</button>
+          <button type="button" id="b-share" hidden>Share ZIP</button>
+          <button type="button" id="b-csv">CSV</button>
+        </div>
+        <p class="fine" id="store-info">—</p>
+
+        <h3>Trees</h3>
+        <div id="tree-list"></div>
+
+        <h3>Photos</h3>
+        <div id="cap-list"></div>
+
+        <details class="live">
+          <summary>Live sensors</summary>
+          <dl class="kv" id="kv"></dl>
+          <label class="fld inline">Camera height (m)<input id="camh-edit" type="number" inputmode="decimal" min="0.2" max="60" step="0.1" /><button type="button" id="camh-set">Set</button></label>
+        </details>
+
+        <p class="fine credit">Shevga <span id="ver"></span> · field notebook for Priyanka · Somdeep Kundu, RuDRA Lab, C-TARA, IIT Bombay · MIT</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Tree picker: nearest first. -->
+<div class="sheet-ov" id="tpick" hidden>
+  <div class="bsheet" role="dialog" aria-modal="true" aria-labelledby="tp-h">
+    <div class="bs-head"><h4 id="tp-h">Which tree?</h4><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <button type="button" class="primary" id="tp-new">＋ New tree</button>
+    <input id="tp-find" class="find" placeholder="Find by tag or painted number" autocomplete="off" />
+    <div id="tp-list"></div>
+  </div>
+</div>
+
+<!-- Tree card: tag, position, form, today's visit. -->
+<div class="sheet-ov" id="tsheet" hidden>
+  <div class="bsheet paper" role="dialog" aria-modal="true" aria-labelledby="ts-h">
+    <div class="bs-head"><h4 id="ts-h">New tree</h4><button type="button" class="x" data-close aria-label="Close">×</button></div>
+
+    <div class="label-card">
+      <div class="lc-row">
+        <label class="fld grow">Tag number<input id="ts-tag" autocomplete="off" autocapitalize="characters" placeholder="L1048" maxlength="16" /></label>
+        <button type="button" id="ts-scan" class="ghost scanbtn" aria-label="Scan the QR on the tag"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5h4M16 5h4v4M20 15v4h-4M8 19H4v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 8h3v3H8zM13 13h3v3h-3zM13 8h3M8 13v3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Scan</button>
+      </div>
+      <label class="fld">Painted number on the trunk<input id="ts-paint" autocomplete="off" inputmode="text" placeholder="e.g. 25" maxlength="12" /></label>
+      <p class="fine" id="ts-qr" hidden></p>
+    </div>
+
+    <h5>Where the tree stands</h5>
+    <div class="locs" id="ts-locs"></div>
+    <p class="fine" id="ts-loc-hint"></p>
+
+    <h5>The tree</h5>
+    <div class="seg" data-f="stems" role="radiogroup" aria-label="Stems">
+      <button type="button" data-v="single">Single stem</button><button type="button" data-v="multi">Multi-stem</button><button type="button" data-v="coppiced">Cut / regrown</button>
+    </div>
+    <div class="lc-row">
+      <label class="fld grow">Girth at 1.3 m (cm)<input id="ts-gbh" type="number" inputmode="decimal" min="1" max="600" step="1" placeholder="tape round the trunk" /></label>
+      <label class="fld grow">Height (m, rough)<input id="ts-ht" type="number" inputmode="decimal" min="0.5" max="30" step="0.5" /></label>
+    </div>
+
+    <h5>Today's visit <span id="ts-date" class="date"></span></h5>
+    <div class="qlabel">Leaves</div>
+    <div class="seg" data-f="leaf" role="radiogroup" aria-label="Leaves">
+      <button type="button" data-v="flush">Flush</button><button type="button" data-v="not_flush">Not flush</button><button type="button" data-v="mixed">Mixed</button><button type="button" data-v="leafless">Bare</button>
+    </div>
+    <div class="qlabel">Flowers</div>
+    <div class="seg" data-f="flowers" role="radiogroup" aria-label="Flowers">
+      <button type="button" data-v="none">None</button><button type="button" data-v="buds">Buds</button><button type="button" data-v="open">Open</button>
+    </div>
+    <div class="qlabel">Pods</div>
+    <div class="seg" data-f="pods" role="radiogroup" aria-label="Pods">
+      <button type="button" data-v="none">None</button><button type="button" data-v="young">Young</button><button type="button" data-v="mature">Mature / dry</button>
+    </div>
+    <div class="qlabel">Leaf sample taken</div>
+    <div class="lc-row">
+      <div class="seg" data-f="sample" role="radiogroup" aria-label="Leaf sample">
+        <button type="button" data-v="no">No</button><button type="button" data-v="yes">Yes</button>
+      </div>
+      <input id="ts-sample" class="grow" placeholder="bag label" autocomplete="off" maxlength="24" />
+    </div>
+    <label class="fld">Note<input id="ts-note" autocomplete="off" placeholder="pruned, pest, near hostel 12…" maxlength="200" /></label>
+
+    <div class="row end">
+      <button type="button" class="ghost danger" id="ts-del" hidden>Delete tree</button>
+      <button type="button" class="primary" id="ts-save">Save tree</button>
+    </div>
+  </div>
+</div>
+
+<!-- Field guide + tutorial launcher -->
+<div class="sheet-ov" id="guide" hidden>
+  <div class="bsheet paper" role="dialog" aria-modal="true" aria-labelledby="g-h">
+    <div class="bs-head"><h4 id="g-h">Field guide</h4><button type="button" class="x" data-close aria-label="Close">×</button></div>
+    <button type="button" class="ghost wide" id="b-tour">Show the tutorial again</button>
+    <h5>Knowing a Shevga</h5>
+    <ul class="tips">
+      <li><b>Leaves</b> feathery, two to three times divided, 30–60 cm long; leaflets small and oval, 1–2 cm, paler beneath.</li>
+      <li><b>Bark</b> pale grey, soft and corky; branches brittle.</li>
+      <li><b>Flowers</b> creamy white, fragrant, in loose sprays. <b>Pods</b> long, ribbed “drumsticks”, 25–45 cm.</li>
+      <li><b>Flush</b> is the new soft, lime-green leaves. Older leaves are darker and firmer.</li>
+    </ul>
+    <h5>Each tree, each visit</h5>
+    <ol class="tips">
+      <li>Open the tree: scan the tag or pick it from the list (nearest first).</li>
+      <li>Fix where it stands — one of the three ways on the tree card.</li>
+      <li>Photos, in the same order every time: whole tree from 8–15 m, the tag, the trunk, the canopy looking up, the leaves, flowers or pods.</li>
+      <li>Fill in leaves, flowers, pods and the sample bag, then Save.</li>
+    </ol>
+    <h5>Direction and GPS on campus</h5>
+    <ul class="tips">
+      <li><b>Compass off?</b> Tap it and draw a slow figure-8 with the phone. <b>DISTURBED</b> means something metal nearby is bending it: a parked car, railings, a pole. Step a few metres away.</li>
+      <li><b>No magnetic phone cases or mounts</b> — they bend every reading.</li>
+      <li><b>GPS under a canopy</b> is often ± 15 m or worse. Lock at the trunk anyway, then add whole-tree photos from two open sides: their directions cross at the tree.</li>
+      <li><b>Picture frozen?</b> Tap ↻ (top right).</li>
+      <li><b>Before leaving</b>, export the ZIP on the Trees tab.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Tutorial: plates first, then a spotlight that walks across the real controls -->
+<div id="tour" hidden>
+  <div id="tour-hole"></div>
+  <div id="tour-card" role="dialog" aria-live="polite">
+    <div id="tour-art" aria-hidden="true"></div>
+    <div class="t-step" id="tour-step"></div>
+    <h4 id="tour-h"></h4>
+    <p id="tour-p"></p>
+    <div class="row"><button type="button" class="ghost" id="tour-skip">Skip</button><button type="button" class="primary" id="tour-next">Next</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "shevga",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Moringa tree geotagging field app for IIT Bombay campus (Priyanka). Static site; no build step.",
+  "license": "MIT",
+  "scripts": {
+    "serve": "python3 -m http.server 8765"
+  }
+}
