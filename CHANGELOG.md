@@ -2,6 +2,11 @@
 
 Notable changes to CropView. The capture app (`index.html`, version in `package.json`) and the Data Explorer (`cropview-viewer-v2.html`) are versioned separately.
 
+## Link previews — 2026-10-27
+
+### Added
+- Preview images and Open Graph tags for `users/saikat/`, `users/tanmay/` and `users/priyanka/`, so a shared link shows a picture card in WhatsApp and other apps.
+
 ## Shevga 1.0.0 — 2026-10-27
 
 ### Added
